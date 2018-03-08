@@ -5,9 +5,36 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include <arpa/inet.h>
 #include <netdb.h>
 
 #define MAXMSG  512
+
+int make_socket (uint16_t port)
+{
+  int sock;
+  struct sockaddr_in name;
+
+  /* Create the socket. */
+  sock = socket (PF_INET, SOCK_STREAM, 0);
+  if (sock < 0)
+    {
+      perror ("socket");
+      exit (EXIT_FAILURE);
+    }
+
+  /* Give the socket a name. */
+  name.sin_family = AF_INET;
+  name.sin_port = htons (port);
+  name.sin_addr.s_addr = htonl (INADDR_ANY);
+  if (bind (sock, (struct sockaddr *) &name, sizeof (name)) < 0)
+    {
+      perror ("bind");
+      exit (EXIT_FAILURE);
+    }
+
+  return sock;
+}
 
 int read_from_client (int filedes)
 {
@@ -32,22 +59,21 @@ int read_from_client (int filedes)
     }
 }
 
-int
-main (int argc, char* argv[])
+int main (int argc, char* argv[])
 {
   extern int make_socket (uint16_t port);
   int sock;
   fd_set active_fd_set, read_fd_set;
   int i, port;
   struct sockaddr_in clientname;
-  size_t size;
+  int size;
 
   if (argc != 2) {
     printf("Please provide a single port number.\n");
     return EXIT_FAILURE;
   }
 
-  port = argv[1];
+  port = atoi(argv[1]);
 
   /* Create the socket and set it up to accept connections. */
   sock = make_socket (port);
