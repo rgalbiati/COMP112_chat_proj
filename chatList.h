@@ -19,10 +19,16 @@ struct chatList {
 // Chat List Functions
 struct chatList *newChatList();
 void freeChatList(struct chatList *c);
+bool existsChat(int chat_id, struct chatList *c);
 int addChat(bool isPublic, int numMembers, char **members, struct chatList *c);
 bool removeChat(int chat_id, struct chatList *c);
-bool isMember(char *client, int chat_id, struct chatList *c);
-int memberAccept(int id, char *client, struct chatList *c) ;
+struct chat *getChat(int chat_id, struct chatList *c);
+int memberAccept(int id, char *client, struct chatList *c);
+void deleteChatsWithMember(char *member, struct chatList *c);
 
+// Chat functions
+int numMembersChat(struct chat *ch);
+int getChatStatus(struct chat *ch);
+bool isMemberChat(char *client, struct chat *ch);
 
 #endif

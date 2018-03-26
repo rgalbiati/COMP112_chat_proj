@@ -47,6 +47,32 @@ void freeChatList(struct chatList *c){
     free(c);
 }
 
+int numMembersChat(struct chat *ch){
+	if (ch == NULL){
+		return 0;
+	}
+	return ch->numMembers;
+}
+
+int getChatStatus(struct chat *ch){
+	if (ch == NULL){
+		return -1;
+	}
+
+	return ch->chatStatus;
+}
+
+bool existsChat(int chat_id, struct chatList *c){
+	int numChats = c->numChats;
+	for (int i = 0; i < numChats; i++) {
+		if (c->chats[i]->id == chat_id) {
+			return true;
+		}
+	}
+
+	return false;
+}
+
 // returns id
 int addChat(bool isPublic, int numMembers, char **members, struct chatList *c) {
 	if (c->numChats == c->maxChats || numMembers > 5) {
@@ -92,20 +118,26 @@ bool removeChat(int chat_id, struct chatList *c) {
 	return false;
 }
 
-
-bool isMember(char *client, int chat_id, struct chatList *c) {
+struct chat *getChat(int chat_id, struct chatList *c) {
 	int numChats = c->numChats;
 	for (int i = 0; i < numChats; i++) {
 		if (c->chats[i]->id == chat_id) {
-			int numMembers = c->chats[i]->numMembers;
-			for (int j = 0; j < numMembers; j++) {
-				if (strcmp(client, c->chats[i]->members[j]) == 0) {
-					return true;
-				}
-			}
-			break;
+			return c->chats[i];
 		}
 	}
+	return NULL;
+}
+
+
+bool isMemberChat(char *client, struct chat *ch) {
+	int numMembers = ch->numMembers;
+
+	for (int j = 0; j < numMembers; j++) {
+		if (strcmp(client, ch->members[j]) == 0) {
+			return true;
+		}
+	}
+
 	return false;
 }
 
@@ -173,6 +205,17 @@ void printChats(struct chatList *c) {
 	}
 }
 
+void deleteChatsWithMember(char *member, struct chatList *c){
+	int numChats = c->numChats;
+	for (int i = 0; i < numChats; i++){
+		struct chat *ch = c->chats[i];
+		if (isMemberChat(member, ch)){
+			removeChat(ch->id, c);
+		}
+	}
+
+}
+
 // int main(){
 // 	printf("CHAT TEST\n");
 
@@ -181,7 +224,7 @@ void printChats(struct chatList *c) {
 
 // 	char *members[] = {"Deanna", "Claire", "Caro"};
 // 	char *members2[] = {"Caro", "Grace"};
-// 	char *members3[] = {"Cupcakes", "Sugar", "Spice"};
+// 	char *members3[] = {"Cupcakes", "Grace", "Spice"};
 
 // 	int chat1_id = addChat(true, 3, members, c);
 // 	int chat2_id = addChat(false, 2, members2, c);
@@ -190,33 +233,41 @@ void printChats(struct chatList *c) {
 
 
 // 	// isMember tests
-// 	if (!isMember("Deanna", chat1_id, c)) {
-// 		printf("Failed isMember1 test\n");
-// 		return -1;
+// 	// if (!isMemberChat("Deanna", chat1_id, c)) {
+// 	// 	printf("Failed isMember1 test\n");
+// 	// 	return -1;
 
-// 	} 
-// 	if (isMember("Deanna", chat2_id, c)){
-// 		printf("Failed isMember2 test\n");
-// 		return -1;
-// 	}
+// 	// } 
+// 	// if (isMemberChat("Deanna", chat2_id, c)){
+// 	// 	printf("Failed isMember2 test\n");
+// 	// 	return -1;
+// 	// }
+// 	struct chat *ch = getChat(chat2_id, c);
 
 // 	memberAccept(chat2_id, "Caro", c);
-// 	printChats(c);
+// 	// printChats(c);
 // 	memberAccept(chat2_id, "Grace", c);
-// 	printChats(c);
+// 	// printChats(c);
 
-
-// 	// remove tests
-// 	if (!removeChat(0, c)){
-// 		printf("Unable to remove chat 2\n");
+// 	if (getChatStatus(ch) != VALID_STATUS){
+// 		printf("FAILED get chat status\n");
 // 		return -1;
 // 	}
+
+// 	deleteChatsWithMember("Grace", c);
+// 	printChats(c);
+
+// 	// //remove tests
+// 	// if (!removeChat(0, c)){
+// 	// 	printf("Unable to remove chat 2\n");
+// 	// 	return -1;
+// 	// }
 	
 
-// 	if (!removeChat(2, c)){
-// 		printf("Unable to remove chat 2\n");
-// 		return -1;
-// 	}
+// 	// if (!removeChat(2, c)){
+// 	// 	printf("Unable to remove chat 2\n");
+// 	// 	return -1;
+// 	// }
 
 	
 // 	// printChats(c);
