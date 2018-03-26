@@ -272,6 +272,13 @@ bool handle_packet(int fd, struct packet *p, struct clientList *client_list,
 
                 // store in mailbox for when user logs back in
                 else {
+                    if (mailboxSize(getClient(c->members[j], client_list))){
+                        printf("Error: client %s's mailbox is full\n", c->members[j]);
+                        // TODO - better error handling here
+                        return true;
+                    }
+
+
                     struct packet pck;
                     pck.type = MSG;
                     memset(pck.src, 0, USER_LEN);
@@ -359,7 +366,38 @@ bool handle_packet(int fd, struct packet *p, struct clientList *client_list,
             sprintf(id_str, "%d", id);
 
             for (int i = 1; i < numClients; i++){
-                send_packet(fd, CHAT_REQ, p->src, members[i], 0, strlen(id_str) + 1, id_str);
+                if (isLoggedIn(members[i], client_list)){
+                    int clientfd = getfd(members[i], client_list);
+                    send_packet(clientfd, CHAT_REQ, p->src, members[i], 
+                                strlen(id_str) + 1, 0, id_str);
+                }
+                    
+                 // store in mailbox
+                else {
+
+                    if (mailboxSize(getClient(members[i], client_list))){
+                        printf("Error: client %s's mailbox is full\n", members[i]);
+                        // TODO - better error handling here
+                        return true;
+                    }
+                    
+                    struct packet pck;
+                    pck.type = CHAT_REQ;
+                    
+                    memset(pck.src, 0, USER_LEN);
+                    memcpy(pck.src, p->src, strlen(p->src) + 1);
+
+                    memset(pck.dst, 0, USER_LEN);
+                    memcpy(pck.dst, members[i], strlen(members[i]) + 1);
+
+                    pck.len = strlen(id_str) + 1;
+                    pck.msg_id = 0;
+                    memset(pck.data, 0, 400);
+                    memcpy(pck.data, id_str, strlen(id_str) + 1);
+                    addPacketMailbox(members[i], pck, client_list);
+                }
+
+
             }
         }
 
@@ -403,12 +441,18 @@ bool handle_packet(int fd, struct packet *p, struct clientList *client_list,
 
                     // store in mailbox
                     else {
+
+                        if (mailboxSize(getClient(ch->members[j], client_list))){
+                            printf("Error: client %s's mailbox is full\n", ch->members[j]);
+                            // TODO - better error handling here
+                            return true;
+                        }
                         struct packet pck;
                         pck.type = CHAT_ACK;
                         memset(pck.src, 0, USER_LEN);
                         memcpy(pck.src, p->src, strlen(p->src) + 1);
                         memset(pck.dst, 0, USER_LEN);
-                        memcpy(pck.dst, "Server", 7);
+                        memcpy(pck.dst, ch->members[j], strlen(ch->members[j]) + 1);
                         pck.len = p->len;
                         pck.msg_id = 0;
                         memset(pck.data, 0, 400);
@@ -452,12 +496,17 @@ bool handle_packet(int fd, struct packet *p, struct clientList *client_list,
                 }
                 // TODO - else store in mailbox + send when user logs back in
                 else {
+                    if (mailboxSize(getClient(ch->members[j], client_list))){
+                        printf("Error: client %s's mailbox is full\n", ch->members[j]);
+                        // TODO - better error handling here
+                        return true;
+                    }
                     struct packet pck;
                     pck.type = CHAT_FAIL;
                     memset(pck.src, 0, USER_LEN);
                     memcpy(pck.src, p->src, strlen(p->src) + 1);
                     memset(pck.dst, 0, USER_LEN);
-                    memcpy(pck.dst, "Server", 7);
+                    memcpy(pck.dst, ch->members[j], strlen(ch->members[j]) + 1);
                     pck.len = p->len;
                     pck.msg_id = 0;
                     memset(pck.data, 0, 400);
