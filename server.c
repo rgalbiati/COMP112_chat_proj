@@ -204,6 +204,9 @@ bool handle_packet(int fd, struct packet *p, struct clientList *client_list,
         // if client exists and is logged in, send
         if (!isLoggedIn(p->src, client_list)){
             printf("Error: client %s already logged out\n", p->src);
+        } else if (fd != getfd(p->src, client_list)) {
+            printf("Error: fd for client %s does not match\n", p->src);
+            return false;
         } else {
             logOutClient(p->src, client_list);
         }
@@ -216,7 +219,12 @@ bool handle_packet(int fd, struct packet *p, struct clientList *client_list,
         // if client exists and is logged in, send
         if (!isLoggedIn(p->src, client_list)){
             printf("Error: client %s is not logged in\n", p->src);
-        }
+        } 
+
+        else if (fd != getfd(p->src, client_list)) {
+            printf("Error: fd for client %s does not match\n", p->src);
+            return false;
+        } 
 
         else {
             sendClientList(fd, p->src, client_list);
@@ -231,6 +239,10 @@ bool handle_packet(int fd, struct packet *p, struct clientList *client_list,
             printf("Error: client %s is not logged in\n", p->src);
         } 
 
+        else if (fd != getfd(p->src, client_list)) {
+            printf("Error: fd for client %s does not match\n", p->src);
+            return false;
+        } 
 
         else { 
             sendChatList(fd, p->src, chat_list);
@@ -253,6 +265,12 @@ bool handle_packet(int fd, struct packet *p, struct clientList *client_list,
             sprintf(error, "Client %s not logged in", p->src);
             send_packet(fd, MSG_ERROR, "Server", p->src, strlen(error) + 1, p->msg_id, error);
         }
+
+        // fd must match
+        else if (fd != getfd(p->src, client_list)) {
+            printf("Error: fd for client %s does not match\n", p->src);
+            return false;
+        } 
 
         // chat does not exist
         else if (c == NULL){
@@ -379,6 +397,13 @@ bool handle_packet(int fd, struct packet *p, struct clientList *client_list,
             send_packet(fd, CHAT_FAIL, "Server", p->src, strlen(error), 0, error);
         }
 
+        // fd must match
+        else if (fd != getfd(p->src, client_list)) {
+            printf("Error: fd for client %s does not match\n", p->src);
+            return false;
+        } 
+
+
         // valid chat -- forward to all clients
         else {
             // for now, all chats public
@@ -436,6 +461,12 @@ bool handle_packet(int fd, struct packet *p, struct clientList *client_list,
         if (ch == NULL){
             printf("Error: requested chat does not exist\n");
         }
+
+        // fd must match
+        else if (fd != getfd(p->src, client_list)) {
+            printf("Error: fd for client %s does not match\n", p->src);
+            return false;
+        } 
 
         else if (!isLoggedIn(p->src, client_list)){
             printf("Error: client %s is not logged in\n", p->src);
@@ -500,6 +531,12 @@ bool handle_packet(int fd, struct packet *p, struct clientList *client_list,
             printf("Error: requested chat does not exist\n");
         }
 
+        // fd must match
+        else if (fd != getfd(p->src, client_list)) {
+            printf("Error: fd for client %s does not match\n", p->src);
+            return false;
+        } 
+
         else if (!isLoggedIn(p->src, client_list)){
             printf("Error: client %s is not logged in\n", p->src);
         } 
@@ -553,6 +590,12 @@ bool handle_packet(int fd, struct packet *p, struct clientList *client_list,
 
         if (!isLoggedIn(p->src, client_list)){
             printf("Error: client %s is not logged in\n");
+        } 
+
+        // fd must match
+        else if (fd != getfd(p->src, client_list)) {
+            printf("Error: fd for client %s does not match\n", p->src);
+            return false;
         } 
 
         else {
