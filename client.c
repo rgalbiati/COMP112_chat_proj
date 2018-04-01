@@ -8,11 +8,13 @@
 #include <netdb.h> 
 #include <stdbool.h>
 
+#include "chatList.h"
+#include "clientList.h"
+
 
 //TODO Client list only prints partially 
 //TODO clean up client interface
 //TODO make code more readable 
-
 const static int USER_LEN = 20;
 const static int PASS_LEN = 30;
 const int BUFSIZE = 512;
@@ -46,15 +48,6 @@ struct __attribute__((__packed__)) header {
     unsigned int msg_id;
 };
 
-struct __attribute__((__packed__)) packet {
-    unsigned short type;
-    char src[20];
-    char dst[20];
-    unsigned int len;
-    unsigned int msg_id;
-    char data[400];
-};
-
 void error(const char *msg);
 char* create_new_user(int sockfd, char* username);
 char* log_in(int sockfd, char* username);
@@ -66,6 +59,18 @@ char* try_again(char* (f) (int, char*), int sockfd, char* error, char* username)
 void print_usage ();
 
 
+void print_clients (struct packet packet)
+{
+    int cursor = 0;
+    char* buf = packet.data;
+
+    while (cursor < packet.len)
+    {
+        printf("%s", buf);
+        cursor += strlen(buf) + 1;
+        buf += strlen(buf) + 1;
+    }
+}
 void error(const char *msg)
 {
     perror(msg);
@@ -217,14 +222,14 @@ bool read_from_server (int sockfd, struct packet *p) {
             memcpy(p->data, data, strlen(data) + 1);
         } else {
             int n = 0;
-            char data[DATA_SIZE];
-            n = read(sockfd, data, DATA_SIZE);
+            char data[p->len];
+            n = read(sockfd, data, p->len);
 
             if (n < 0) {
                 printf("Error reading packet data from client %s\n", p->src);
                 return false;
             }
-            memcpy(p->data, data, DATA_SIZE + 1);
+            memcpy(p->data, data, p->len + 1);
         }
 
         return true;
@@ -304,7 +309,7 @@ int main(int argc, char *argv[])
                 send_packet(sockfd, CLIENT_LIST_REQ, client_username, "Server", 0, 0, "");
                 struct packet p;
                 read_from_server(sockfd, &p);
-                printf("%s\n", p.data);
+                print_clients(p);
             }
             else if (strncmp("Logout", buffer, 6) == 0) {
                 done = true;
