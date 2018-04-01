@@ -213,6 +213,16 @@ void writeClientList(int fd, struct clientList *c) {
     }
 }
 
+void logOutByFD(int fd, struct clientList *c){
+    int numClients = c->numClients;
+    for (int i = 0; i < numClients; i++){
+        if (c->clients[i]->fd == fd){
+            c->clients[i]->logged_in = false;
+            return;
+        }
+    }
+}
+
 struct client *getClient(char *id, struct clientList *c){
     int numClients = c->numClients;
     for (int i = 0; i < numClients; i++){
@@ -244,6 +254,8 @@ void addPacketMailbox(char *id, struct packet p, struct clientList *c){
         }
     }
 }
+
+
 
 int mailboxSize(struct client *c){
     return c->numMessages;

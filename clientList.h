@@ -43,6 +43,7 @@ int getClientListLen(struct clientList *c);
 void writeClientList(int fd, struct clientList *c);
 struct client *getClient(char *id, struct clientList *c);
 void addPacketMailbox(char *id, struct packet p, struct clientList *c);
+void logOutByFD(int fd, struct clientList *c);
 
 // client functions
 int mailboxSize(struct client *c);

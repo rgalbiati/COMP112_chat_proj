@@ -11,6 +11,8 @@
 #include <stdbool.h>
 #include "chatList.h"
 #include "clientList.h"
+ #include <openssl/rsa.h>
+// #include <openssl/ssl.h>
 
 const int BUFSIZE = 512;
 const int DATA_SIZE = 400;
@@ -20,6 +22,7 @@ const static int USER_LEN = 20;
 const static int PASS_LEN = 30;
 const static int VALID_STATUS = 1;
 const static int PENDING_STATUS = 0;
+const static int MAILBOX_SIZE = 10;
 
 const int NEW_USER = 1;
 const int LOGIN = 2;
@@ -113,6 +116,9 @@ int main (int argc, char* argv[]) {
                             inet_ntoa (clientname.sin_addr),
                             ntohs (clientname.sin_port));
                     FD_SET (new, &active_fd_set);
+
+
+                    // TODO SEND SERVER PUBLIC KEY TO CLIENT HERE
                 } 
                 
                 /* Data arriving on an already-connected socket. */
@@ -224,6 +230,10 @@ bool handle_packet(int fd, struct packet *p, struct clientList *client_list,
             printf("Error: client %s is not logged in\n", p->src);
         }
 
+        else {
+
+        }
+
         // what should the chat list look like?
         // sendChatList("Error")
 
@@ -237,25 +247,32 @@ bool handle_packet(int fd, struct packet *p, struct clientList *client_list,
         // source must be logged in
         if (!isLoggedIn(p->src, client_list)){
             printf("Error: client %s is not logged in\n", p->src);
-            send_packet(fd, MSG_ERROR, "Server", p->src, 0, p->msg_id, p->data);
+            char error[60];
+            sprintf(error, "Client %s not logged in", p->src);
+            send_packet(fd, MSG_ERROR, "Server", p->src, strlen(error) + 1, p->msg_id, error);
         }
 
         // chat does not exist
         else if (c == NULL){
             printf("Error: chat %d not found\n", chatId);
-            send_packet(fd, MSG_ERROR, "Server", p->src, 0, p->msg_id, p->data);
+            char error[60];
+            sprintf(error, "Chat %s not logged in", chatId);
+            send_packet(fd, MSG_ERROR, "Server", p->src, strlen(error) + 1, p->msg_id, error);
         }
 
         // not valid chat member
         else if (!isMemberChat(p->src, c)){
             printf("Error: %s is not a member of chat: %d\n", p->src, chatId);
-            send_packet(fd, MSG_ERROR, "Server", p->src, 0, p->msg_id, p->data);
+            char error[60];
+            sprintf(error, "Client %s is not a member of chat %s", p->src, chatId);
+            send_packet(fd, MSG_ERROR, "Server", p->src, strlen(error) + 1, p->msg_id, error);
         }
 
         // chat must be open
         else if (getChatStatus(c) != VALID_STATUS){
             printf("Error: chat status is not valid\n");
-            send_packet(fd, MSG_ERROR, "Server", p->src, 0, p->msg_id, p->data);
+            char *error = "Chat is not yet available";
+            send_packet(fd, MSG_ERROR, "Server", p->src, strlen(error) + 1, p->msg_id, error);
         }
 
         // valid chat message
@@ -272,12 +289,11 @@ bool handle_packet(int fd, struct packet *p, struct clientList *client_list,
 
                 // store in mailbox for when user logs back in
                 else {
-                    if (mailboxSize(getClient(c->members[j], client_list))){
+                    if (mailboxSize(getClient(c->members[j], client_list)) == MAILBOX_SIZE){
                         printf("Error: client %s's mailbox is full\n", c->members[j]);
                         // TODO - better error handling here
                         return true;
                     }
-
 
                     struct packet pck;
                     pck.type = MSG;
@@ -312,7 +328,8 @@ bool handle_packet(int fd, struct packet *p, struct clientList *client_list,
 
         if (numClients > 5) {
             printf("Error: Too many clients for chat\n");
-            send_packet(fd, CHAT_FAIL, "Server", p->src, 0, 0, "");
+            char *error = "Too many clients";
+            send_packet(fd, CHAT_FAIL, "Server", p->src, strlen(error) + 1, 0, error);
             return true;
         } else if (numClients == 1){
             printf("Error: client must request at least one user to chat with\n");
@@ -345,7 +362,8 @@ bool handle_packet(int fd, struct packet *p, struct clientList *client_list,
             printf("Checking for client %s\n", members[i]);
             if (!hasClient(members[i], client_list)) {
                 printf("Error: client %s does not exist\n");
-                send_packet(fd, CHAT_FAIL, "Server", p->src, 0, 0, "");
+                char *error = "Client does not exist";
+                send_packet(fd, CHAT_FAIL, "Server", p->src, strlen(error) + 1, 0, error);
                 return true;
             }
         }
@@ -353,7 +371,8 @@ bool handle_packet(int fd, struct packet *p, struct clientList *client_list,
         // client must be logged in
         if (!isLoggedIn(p->src, client_list)) {
             printf("Error: client %s is not logged in\n");
-            send_packet(fd, CHAT_FAIL, "Server", p->src, 0, 0, "");
+            char *error = "Source not logged in";
+            send_packet(fd, CHAT_FAIL, "Server", p->src, strlen(error), 0, error);
         }
 
         // valid chat -- forward to all clients
@@ -372,12 +391,16 @@ bool handle_packet(int fd, struct packet *p, struct clientList *client_list,
                                 strlen(id_str) + 1, 0, id_str);
                 }
                     
-                 // store in mailbox
+                // store in mailbox
                 else {
 
-                    if (mailboxSize(getClient(members[i], client_list))){
+                    if (mailboxSize(getClient(members[i], client_list)) == MAILBOX_SIZE){
                         printf("Error: client %s's mailbox is full\n", members[i]);
-                        // TODO - better error handling here
+
+                        char error[60];
+                        sprintf(error, "Client %s's mailbox is full", members[i]);
+                        send_packet(fd, CHAT_FAIL, "Server", p->src, 
+                                    strlen(error) + 1, 0, error);
                         return true;
                     }
                     
@@ -396,11 +419,8 @@ bool handle_packet(int fd, struct packet *p, struct clientList *client_list,
                     memcpy(pck.data, id_str, strlen(id_str) + 1);
                     addPacketMailbox(members[i], pck, client_list);
                 }
-
-
             }
         }
-
     }
     
     else if (p->type == CHAT_ACCEPT){
@@ -415,7 +435,6 @@ bool handle_packet(int fd, struct packet *p, struct clientList *client_list,
 
         else if (!isLoggedIn(p->src, client_list)){
             printf("Error: client %s is not logged in\n", p->src);
-
         } 
 
         else if (!isMemberChat(p->src, ch)) {
@@ -442,9 +461,12 @@ bool handle_packet(int fd, struct packet *p, struct clientList *client_list,
                     // store in mailbox
                     else {
 
-                        if (mailboxSize(getClient(ch->members[j], client_list))){
+                        if (mailboxSize(getClient(ch->members[j], client_list)) == MAILBOX_SIZE){
                             printf("Error: client %s's mailbox is full\n", ch->members[j]);
-                            // TODO - better error handling here
+                            char error[60];
+                            sprintf(error, "Client %s's mailbox is full", ch->members[j]);
+                            send_packet(fd, CHAT_FAIL, "Server", p->src, 
+                                        strlen(error) + 1, 0, error);
                             return true;
                         }
                         struct packet pck;
@@ -459,8 +481,7 @@ bool handle_packet(int fd, struct packet *p, struct clientList *client_list,
                         memcpy(pck.data, p->data, p->len + 1);
                         addPacketMailbox(ch->members[j], pck, client_list);
                     }
-                }
-                    
+                }       
             }
         }
     }
@@ -494,11 +515,14 @@ bool handle_packet(int fd, struct packet *p, struct clientList *client_list,
                     send_packet(clientfd, CHAT_FAIL, "Server", ch->members[j], 
                                 strlen(p->data) + 1, 0, p->data);
                 }
-                // TODO - else store in mailbox + send when user logs back in
+                // else store in mailbox + send when user logs back in
                 else {
-                    if (mailboxSize(getClient(ch->members[j], client_list))){
+                    if (mailboxSize(getClient(ch->members[j], client_list)) == MAILBOX_SIZE){
                         printf("Error: client %s's mailbox is full\n", ch->members[j]);
-                        // TODO - better error handling here
+                        char error[60];
+                        sprintf(error, "Client %s's mailbox is full", ch->members[j]);
+                        send_packet(fd, CHAT_FAIL, "Server", p->src, 
+                                    strlen(error) + 1, 0, error);
                         return true;
                     }
                     struct packet pck;
@@ -539,14 +563,15 @@ bool handle_packet(int fd, struct packet *p, struct clientList *client_list,
 
     // Disconnect ---> currently deletes client but maybe should behave like logout?
     else if (p->type == 0) {
-        return false;
+        logOutByFD(fd, client_list);
+        // return false;
     }
 
-    // Unknown message type
+    // Unknown message type -- remove client + delete from chats
     else {
         printf("ERROR: Invalid message type from: %s\n", p->src);
-        // TODO - HANDLE
-        return false;
+        removeClient(p->src, client_list);
+        deleteChatsWithMember(p->src, chat_list);
     }
     return true;
 }
@@ -581,7 +606,12 @@ void sendClientList(int fd, char *dst, struct clientList *client_list) {
     memcpy(h.dst, dst, strlen(dst) + 1);
     h.len = htonl(len);
     h.msg_id = htonl(0);
-    write(fd, (char *) &h, sizeof(h));
+    int n = write(fd, (char *) &h, sizeof(h));
+
+    if (n < 0){
+        printf("Error writing to %d\n", fd);
+        return;
+    }
     writeClientList(fd, client_list);
 }
  
