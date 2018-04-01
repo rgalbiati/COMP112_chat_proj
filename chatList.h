@@ -25,10 +25,13 @@ bool removeChat(int chat_id, struct chatList *c);
 struct chat *getChat(int chat_id, struct chatList *c);
 int memberAccept(int id, char *client, struct chatList *c);
 void deleteChatsWithMember(char *member, struct chatList *c);
+void writeChatList(int fd, char *client, struct chatList *c);
+int getChatListLen(char *client, struct chatList *c);
 
 // Chat functions
 int numMembersChat(struct chat *ch);
 int getChatStatus(struct chat *ch);
 bool isMemberChat(char *client, struct chat *ch);
+bool isPublic(struct chat *ch);
 
 #endif

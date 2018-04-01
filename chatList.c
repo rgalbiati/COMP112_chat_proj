@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdbool.h>
 #include <string.h>
+#include <unistd.h>
 #include "chatList.h"
 
 const static int MAX_CHATS = 100;
@@ -128,6 +129,34 @@ struct chat *getChat(int chat_id, struct chatList *c) {
 	return NULL;
 }
 
+int getChatListLen(char *client, struct chatList *c){
+	int len = 0;
+	int numChats = c->numChats;
+	for (int i = 0; i < numChats; i++){
+		if (isPublic(c->chats[i]) || isMemberChat(client, c->chats[i])){
+			struct chat *ch = c->chats[i];
+			int numMembers = ch->numMembers;
+			for (int j = 0; j < numMembers; j++){
+				len += strlen(ch->members[j]+ 1);
+			}
+		}
+	}
+	return len;
+}
+
+void writeChatList(int fd, char *client, struct chatList *c){
+	int numChats = c->numChats;
+	for (int i = 0; i < numChats; i++){
+		if (isPublic(c->chats[i]) || isMemberChat(client, c->chats[i])){
+			struct chat *ch = c->chats[i];
+			int numMembers = ch->numMembers;
+			for (int j = 0; j < numMembers; j++){
+				write(fd, ch->members[j], strlen(ch->members[j]) + 1);
+			}
+			write(fd, "\n", 1);
+		}
+	}
+}
 
 bool isMemberChat(char *client, struct chat *ch) {
 	int numMembers = ch->numMembers;
@@ -214,6 +243,10 @@ void deleteChatsWithMember(char *member, struct chatList *c){
 		}
 	}
 
+}
+
+bool isPublic(struct chat *ch) {
+	return ch->public;
 }
 
 // int main(){
