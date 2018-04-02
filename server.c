@@ -57,6 +57,7 @@ bool handle_packet(int fd, struct packet *p, struct clientList *client_list,
 void send_packet(int fd, int type, char *src, char *dst, int len, int msg_id, 
                  char *data);
 void sendClientList(int fd, char *dst, struct clientList *client_list);
+void sendChatList(int fd, char *dst, struct chatList *chat_list);
 int make_socket (uint16_t port);
 bool read_from_client (int fd, struct packet *p);
 void print_packet(struct packet *p);
@@ -203,6 +204,9 @@ bool handle_packet(int fd, struct packet *p, struct clientList *client_list,
         // if client exists and is logged in, send
         if (!isLoggedIn(p->src, client_list)){
             printf("Error: client %s already logged out\n", p->src);
+        } else if (fd != getfd(p->src, client_list)) {
+            printf("Error: fd for client %s does not match\n", p->src);
+            return false;
         } else {
             logOutClient(p->src, client_list);
         }
@@ -215,7 +219,12 @@ bool handle_packet(int fd, struct packet *p, struct clientList *client_list,
         // if client exists and is logged in, send
         if (!isLoggedIn(p->src, client_list)){
             printf("Error: client %s is not logged in\n", p->src);
-        }
+        } 
+
+        else if (fd != getfd(p->src, client_list)) {
+            printf("Error: fd for client %s does not match\n", p->src);
+            return false;
+        } 
 
         else {
             sendClientList(fd, p->src, client_list);
@@ -228,10 +237,15 @@ bool handle_packet(int fd, struct packet *p, struct clientList *client_list,
         // if client exists and is logged in, get the correct list & send
         if (!isLoggedIn(p->src, client_list)){
             printf("Error: client %s is not logged in\n", p->src);
-        }
+        } 
 
-        else {
+        else if (fd != getfd(p->src, client_list)) {
+            printf("Error: fd for client %s does not match\n", p->src);
+            return false;
+        } 
 
+        else { 
+            sendChatList(fd, p->src, chat_list);
         }
 
         // what should the chat list look like?
@@ -251,6 +265,12 @@ bool handle_packet(int fd, struct packet *p, struct clientList *client_list,
             sprintf(error, "Client %s not logged in", p->src);
             send_packet(fd, MSG_ERROR, "Server", p->src, strlen(error) + 1, p->msg_id, error);
         }
+
+        // fd must match
+        else if (fd != getfd(p->src, client_list)) {
+            printf("Error: fd for client %s does not match\n", p->src);
+            return false;
+        } 
 
         // chat does not exist
         else if (c == NULL){
@@ -333,6 +353,8 @@ bool handle_packet(int fd, struct packet *p, struct clientList *client_list,
             return true;
         } else if (numClients == 1){
             printf("Error: client must request at least one user to chat with\n");
+            char *error = "Client must request at least one user to chat with";
+            send_packet(fd, CHAT_FAIL, "Server", p->src, strlen(error) + 1, 0, error);
             return true;
         }
 
@@ -374,6 +396,13 @@ bool handle_packet(int fd, struct packet *p, struct clientList *client_list,
             char *error = "Source not logged in";
             send_packet(fd, CHAT_FAIL, "Server", p->src, strlen(error), 0, error);
         }
+
+        // fd must match
+        else if (fd != getfd(p->src, client_list)) {
+            printf("Error: fd for client %s does not match\n", p->src);
+            return false;
+        } 
+
 
         // valid chat -- forward to all clients
         else {
@@ -432,6 +461,12 @@ bool handle_packet(int fd, struct packet *p, struct clientList *client_list,
         if (ch == NULL){
             printf("Error: requested chat does not exist\n");
         }
+
+        // fd must match
+        else if (fd != getfd(p->src, client_list)) {
+            printf("Error: fd for client %s does not match\n", p->src);
+            return false;
+        } 
 
         else if (!isLoggedIn(p->src, client_list)){
             printf("Error: client %s is not logged in\n", p->src);
@@ -496,6 +531,12 @@ bool handle_packet(int fd, struct packet *p, struct clientList *client_list,
             printf("Error: requested chat does not exist\n");
         }
 
+        // fd must match
+        else if (fd != getfd(p->src, client_list)) {
+            printf("Error: fd for client %s does not match\n", p->src);
+            return false;
+        } 
+
         else if (!isLoggedIn(p->src, client_list)){
             printf("Error: client %s is not logged in\n", p->src);
         } 
@@ -551,6 +592,12 @@ bool handle_packet(int fd, struct packet *p, struct clientList *client_list,
             printf("Error: client %s is not logged in\n");
         } 
 
+        // fd must match
+        else if (fd != getfd(p->src, client_list)) {
+            printf("Error: fd for client %s does not match\n", p->src);
+            return false;
+        } 
+
         else {
             // Currently, all chats with the src as a member are deleted
             deleteChatsWithMember(p->src, chat_list);
@@ -561,7 +608,7 @@ bool handle_packet(int fd, struct packet *p, struct clientList *client_list,
         send_packet(fd, DELETE_ACK, "Server", p->src, 0, 0, "");
     } 
 
-    // Disconnect ---> currently deletes client but maybe should behave like logout?
+    // Disconnect ---> behaves like logout
     else if (p->type == 0) {
         logOutByFD(fd, client_list);
         // return false;
@@ -613,6 +660,29 @@ void sendClientList(int fd, char *dst, struct clientList *client_list) {
         return;
     }
     writeClientList(fd, client_list);
+}
+
+void sendChatList(int fd, char *dst, struct chatList *chat_list) {
+    int len = getChatListLen(dst, chat_list);
+
+    struct header h;
+    h.type = htons(CHAT_LIST);
+
+    memset(h.src, 0, 20);
+    memset(h.dst, 0, 20);
+    memcpy(h.src, "Server", strlen("Server") + 1);
+    memcpy(h.dst, dst, strlen(dst) + 1);
+    h.len = htonl(len);
+    h.msg_id = htonl(0);
+    int n = write(fd, (char *) &h, sizeof(h));
+
+    if (n < 0){
+        printf("Error writing to %d\n", fd);
+        return;
+    }
+
+    writeChatList(fd, dst, chat_list);
+
 }
  
 // Creates socket and returns new file descriptor
