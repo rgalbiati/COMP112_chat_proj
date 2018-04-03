@@ -318,9 +318,13 @@ bool handle_packet(int fd, struct packet *p, struct clientList *client_list,
             int numMembers = numMembersChat(c);
             for (int j = 0; j < numMembers; j++){
 
+                if (strcmp(p->src, c->members[j]) == 0){
+                    continue;
+                }
+
                 // send if logged in
                 if (isLoggedIn(c->members[j], client_list)){
-                    int clientfd = getfd(p->src, client_list);
+                    int clientfd = getfd(c->members[j], client_list);
                     send_packet(clientfd, MSG, p->src, c->members[j], p->len, 
                             p->msg_id, p->data);
                 } 
