@@ -332,8 +332,16 @@ bool welcome_user (int sockfd)
 
 void print_usage ()
 {
-    //pass
+    printf("Options : Multi-User Chat\n");
+    printf("    ->  List Clients    -- Print list of all clients\n");
+    printf("    ->  List Chats      -- Print list of all public chats\n");
+    printf("    ->  Create Chat     -- Create a new chat\n");
+    printf("    ->  Send Message    -- Send a message to a chat\n");
+    printf("    ->  Logout          -- log off server\n");
+    printf("    ->  Delete Client   -- Delete account\n");
+    printf("    ->  Print Usage     -- Print program options\n");
 }
+
 
 void send_chat_req(int sockfd)
 {
@@ -482,8 +490,6 @@ int main(int argc, char *argv[])
     serv_addr.sin_port = htons(portno);
     if (connect(sockfd,(struct sockaddr *) &serv_addr,sizeof(serv_addr)) < 0) 
         error("ERROR connecting");
-    
-    
 
     if (welcome_user(sockfd)) {
         printf("Welcome to the chat server. What would you like to do?\n");
@@ -553,8 +559,11 @@ int main(int argc, char *argv[])
                     struct packet p;
                     read_from_server(sockfd, &p);
                     // if (p.type == 17)
-                    printf("User %s has been deleted.\n", USERNAME);
+                    printf("User %s has been deleted\n", USERNAME);
                     close(sockfd);
+                }
+                else if (strncmp("Print Usage", buffer, 11) == 0) {
+                    print_usage();
                 }
                 else {
                     printf("Invalid input\n");
@@ -567,11 +576,5 @@ int main(int argc, char *argv[])
         printf("Goodbye\n");
         close(sockfd);
     }
-
-
-    // else {
-    //     //TODO Make logout timeout?
-    //     logout(sockfd, client_username);
-    // }
     return 0;
 }
