@@ -19,30 +19,32 @@
 //TODO Client list only prints partially 
 //TODO clean up client interface
 //TODO make code more readable 
-const static int USER_LEN = 20;
+#define USER_LEN 20
 const static int PASS_LEN = 30;
 const int BUFSIZE = 512;
 const int DATA_SIZE = 400;
 
-const int NEW_USER = 1;         // Write
-const int LOGIN = 2;            // W
-const int LOGOUT = 3;           // W
-const int LOGIN_ACK = 4;        // R
-const int LOGIN_FAIL = 5;       // R
-const int CLIENT_LIST_REQ = 6;  // W
+const int NEW_USER = 1;         // Write --DONE
+const int LOGIN = 2;            // Write --DONE
+const int LOGOUT = 3;           // W --DONE
+const int LOGIN_ACK = 4;        // R --DONE
+const int LOGIN_FAIL = 5;       // R --DONE
+const int CLIENT_LIST_REQ = 6;  // W --DONE
 const int CHAT_LIST_REQ = 7;    // W
-const int CLIENT_LIST = 8;      // R
+const int CLIENT_LIST = 8;      // R --DONE
 const int CHAT_LIST = 9;        // R
-const int MSG = 10;             // W
-const int CREATE_CHAT = 11;     // W
-const int CHAT_ACK = 12;        // R
-const int CHAT_FAIL = 13;       // R
-const int CHAT_ACCEPT = 14;     // W
-const int CHAT_REJECT = 15;     // W
-const int DELETE_USER = 16;     // W
-const int DELETE_ACK = 17;      // 
-const int MSG_ERROR = 18;       // R
-const int CHAT_REQ = 19;        // W
+const int MSG = 10;             // W --DONEish
+const int CREATE_CHAT = 11;     // W --DONE
+const int CHAT_ACK = 12;        // R --DONE
+const int CHAT_FAIL = 13;       // R --DONE
+const int CHAT_ACCEPT = 14;     // W --DONE
+const int CHAT_REJECT = 15;     // W --DONE
+const int DELETE_USER = 16;     // W --DONE
+const int DELETE_ACK = 17;      // R --DONEish
+const int MSG_ERROR = 18;       // R 
+const int CHAT_REQ = 19;        // W --DONEish
+
+char USERNAME[USER_LEN];
 
 struct __attribute__((__packed__)) header {
     unsigned short type;
@@ -53,13 +55,13 @@ struct __attribute__((__packed__)) header {
 };
 
 void error(const char *msg);
-char* create_new_user(int sockfd, char* username);
-char* log_in(int sockfd, char* username);
+bool create_new_user(int sockfd);
+bool login(int sockfd);
 void send_packet(int fd, int type, char *src, char *dst, int len, int msg_id, 
                  char *data);
 bool read_from_server (int sockfd, struct packet *p);
-char* welcome_user (int sockfd, char* username);
-char* try_again(char* (f) (int, char*), int sockfd, char* error, char* username);
+bool welcome_user (int sockfd);
+bool try_again(bool (f) (int), int sockfd, char* error);
 void print_usage ();
 
 
@@ -97,7 +99,7 @@ void error(const char *msg)
     exit(0);
 }
 
-char* try_again(char* (f) (int, char*), int sockfd, char* error, char* username) 
+bool try_again(bool (f) (int), int sockfd, char* error) 
 {
     char input[4];
 
@@ -107,13 +109,13 @@ char* try_again(char* (f) (int, char*), int sockfd, char* error, char* username)
         fgets(input, 4 ,stdin);
         
         if (strncmp(input, "Y", 1) == 0 || strncmp(input, "y", 1) == 0) {
-            return f(sockfd, username);
+            return f(sockfd);
         }
         else if (strncmp(input, "N", 1) != 0 && strncmp(input, "n", 1) != 0) {
             printf("Invalid input. Would you like to try again?[y/n]\n");
         }
         else {
-            return NULL;
+            return false;
         }
     }
 }
@@ -126,12 +128,13 @@ char* sanitize_input(char* word)
     return word;
 }
 
-char* create_new_user(int sockfd, char* username)
+bool create_new_user(int sockfd)
 {
     char* password;
     bool valid = false;
+    char username[256];
 
-    printf("Please enter a username. NOTE: must be less than %d charactors): ", USER_LEN);
+    printf("Enter a username : ", USER_LEN);
     while (!valid) {
         bzero(username,256);
         fgets(username,256,stdin);
@@ -144,7 +147,7 @@ char* create_new_user(int sockfd, char* username)
     }
 
     valid = false;
-    printf("Please enter a password. NOTE: must be less than %d charactors): ", PASS_LEN);
+    printf("Enter a password : ", PASS_LEN);
     while (!valid) {
         password = getpass("");
 
@@ -155,58 +158,86 @@ char* create_new_user(int sockfd, char* username)
             valid = true;
     }
 
-    char* new_username = sanitize_input(username);
+    memcpy(USERNAME, sanitize_input(username), strlen(username));
 
-    // char* new_password = sanitize_input(password);
-
-    send_packet(sockfd, NEW_USER, new_username, "Server", strlen(password), 0, password);
+    send_packet(sockfd, NEW_USER, USERNAME, "Server", strlen(password), 0, password);
 
     struct packet p;
 
     read_from_server(sockfd, &p);
 
     if (p.type == LOGIN_ACK) {
-        return new_username;
+        return true;
     }
 
     else 
-        return try_again(create_new_user, sockfd, "Unable to create new user", new_username);
-
+        if (try_again(create_new_user, sockfd, "Unable to create new user") == false) {
+            printf("Would you like to login as an existing user? [y/n]\n");
+            while(1) {
+                char input[4];
+                bzero(input, 4);
+                fgets(input, 4 ,stdin);
+        
+                if (strncmp(input, "Y", 1) == 0 || strncmp(input, "y", 1) == 0) {
+                    return login(sockfd);
+                }
+                else if (strncmp(input, "N", 1) != 0 && strncmp(input, "n", 1) != 0) {
+                    printf("Invalid input. [y/n]\n");
+                }
+                else
+                    return false;
+            }
+        }
+        return true;
 }
 
-char* log_in(int sockfd, char* username) 
+bool login(int sockfd) 
 {
     char* password;
     char input[4];
+    char username[256];
 
-    printf("Please enter your username : ");
+    printf("Username : ");
     bzero(username,256);
     fgets(username,256,stdin);
 
     password = getpass("Password : ");
 
-    char* new_username = sanitize_input(username);
-// 
-    // char* new_password = sanitize_input(password);
+    memcpy(USERNAME, sanitize_input(username), strlen(username));
 
-    send_packet(sockfd, LOGIN, new_username, "Server", strlen(password), 0, password);
+    send_packet(sockfd, LOGIN, USERNAME, "Server", strlen(password), 0, password);
 
     struct packet p;
 
     read_from_server(sockfd, &p);
 
     if (p.type == LOGIN_ACK) {
-        return new_username;
+        return true;
     }
     else {
-        return try_again(log_in, sockfd, "Invalid username or password", new_username);
+        if (try_again(login, sockfd, "Invalid username or password") == false) {
+            printf("Would you like to create a new user? [y/n]\n");
+            while(1) {
+                bzero(input, 4);
+                fgets(input, 4 ,stdin);
+        
+                if (strncmp(input, "Y", 1) == 0 || strncmp(input, "y", 1) == 0) {
+                    return create_new_user(sockfd);
+                }
+                else if (strncmp(input, "N", 1) != 0 && strncmp(input, "n", 1) != 0) {
+                    printf("Invalid input. [y/n]\n");
+                }
+                else
+                    return false;
+            }
+        }
+        return true;
     }
-
 }
 
-void logout(int sockfd, char* username) 
+void logout(int sockfd) 
 {
-    send_packet(sockfd, LOGOUT, username, "Server", 0, 0, "");
+    send_packet(sockfd, LOGOUT, USERNAME, "Server", 0, 0, "");
     printf("Goodbye\n");
     close(sockfd);
 }
@@ -214,6 +245,12 @@ void logout(int sockfd, char* username)
 void send_packet(int sockfd, int type, char *src, char *dst, int len, int msg_id, 
                  char *data)
 {
+    printf("s_type %d\n", type);
+    printf("s_src %s\n", src);
+    printf("s_dst %s\n", dst);
+    printf("s_len %d\n", len);
+    printf("s_data %s\n", data);
+
     char buffer[256];
     int n;
     struct header p;
@@ -271,31 +308,26 @@ bool read_from_server (int sockfd, struct packet *p) {
     }
 }
 
-char* welcome_user (int sockfd, char* username)
+bool welcome_user (int sockfd)
 {
-    bool done = false;
-    char buffer[256];
+    char buffer[4];
 
     printf("Welcome to the multi-user chat.\n");
 
-    while (!done) {
+    while (1) {
         printf("Enter ’N’ to create a new user or ‘L’ to log in as an existing user.\n");
-        bzero(buffer,256);
-        fgets(buffer,256,stdin);
+        bzero(buffer,4);
+        fgets(buffer,4,stdin);
         if (strncmp(buffer, "N", 1) == 0 || strncmp(buffer, "n", 1) == 0) {
-            username = create_new_user(sockfd, username);
-            done = true;
+            return create_new_user(sockfd);
         }
         else if (strncmp(buffer, "L", 1) == 0 || strncmp(buffer, "l", 1) == 0) {
-            username = log_in(sockfd, username);            
-            done = true;
+            return login(sockfd);            
         }
         else {
             printf("Invalid input.\n");
         }
     } 
-    
-    return username;
 }
 
 void print_usage ()
@@ -303,21 +335,7 @@ void print_usage ()
     //pass
 }
 
-// int get_len(char (*)[((int)USER_LEN + 1)], int num_clients)
-// {
-//     int len = 0;
-//     printf("%s\n", clients[0]);
-
-
-
-//     // for (int i = 0; i < num_clients; i++) {
-//     //     printf("%s\n", clients[i]);
-//     // }
-//     exit(0);
-//     return len;
-// }
-
-void send_chat_req(char* client_username, int sockfd)
+void send_chat_req(int sockfd)
 {
     bool valid = false;
     int num_clients;
@@ -356,7 +374,6 @@ void send_chat_req(char* client_username, int sockfd)
         strcpy(clients[i], new_username);
     }
 
-    //TODO Maybe make into seperate func
     int len = 0;
     for (int i = 0; i < num_clients; i++) {
         len += strlen(clients[i]) + 1;
@@ -366,35 +383,67 @@ void send_chat_req(char* client_username, int sockfd)
     h.type = htons(CREATE_CHAT);
     memset(h.src, 0, 20);
     memset(h.dst, 0, 20);
-    memcpy(h.src, client_username, strlen(client_username) + 1);
+    memcpy(h.src, USERNAME, strlen(USERNAME) + 1);
     memcpy(h.dst, "Server", strlen("Server") + 1);
     h.len = htonl(len);
     h.msg_id = htonl(0);
     write(sockfd, (char *) &h, sizeof(h));
 
-
-    //TODO Make seperate function 
     for (int i = 0; i < num_clients; i++){
         write(sockfd, clients[i], strlen(clients[i]) + 1);
     }
 }
 
-void send_message (char* username, int sockfd) 
+void send_message (int sockfd) 
 {
     char buffer [256];
 
-    printf("What chat would you like to send a message to?\n");
+    printf("Chat ID : ");
     bzero(buffer,256);
     fgets(buffer,256,stdin);
     char* id = buffer;
     id = sanitize_input(id);
-    printf("What would you like to say?\n");
+    printf("New Message : ");
     bzero(buffer,256);
     fgets(buffer,256,stdin);
 
     // not sure what to do with message id...
-    send_packet(sockfd, MSG, username, id, strlen(buffer), 
+    send_packet(sockfd, MSG, USERNAME, id, strlen(buffer) + 1, 
                             1, buffer);
+}
+
+
+void respond_to_request (int sockfd, struct packet *p)
+{
+    printf("You have recieved a chat request from %s." \
+        "  Would you like to accept the request? [y/n]\n", p->src);
+                    
+    bool valid = false;
+    int accept;
+    while (!valid) {
+        char input [4];
+        bzero(input, 4);
+        fgets(input, 4 ,stdin);
+        
+        if (strncmp(input, "Y", 1) == 0 || strncmp(input, "y", 1) == 0) {
+            accept = CHAT_ACCEPT;
+            valid = true;
+        }
+        else if (strncmp(input, "N", 1) != 0 && strncmp(input, "n", 1) != 0) {
+            printf("Invalid input. Would you like to accept the request? [y/n]\n");
+        }
+        else {
+            accept = CHAT_REJECT;
+            valid = true;
+        }
+    }
+    send_packet(sockfd, accept, USERNAME, "Server", strlen(p->data) + 1, 0, p->data);
+}
+
+void read_message(struct packet *p)
+{
+    printf("%s : %s : ", p->src, p->dst);
+    printf("%s\n", p->data);
 }
 
 int main(int argc, char *argv[])
@@ -403,7 +452,7 @@ int main(int argc, char *argv[])
     struct sockaddr_in serv_addr;
     struct hostent *server;
     bool done = false;
-    char username [USER_LEN];
+    // char username [USER_LEN];
     fd_set writefds;
     fd_set readfds;
     struct pollfd fd;
@@ -434,9 +483,9 @@ int main(int argc, char *argv[])
     if (connect(sockfd,(struct sockaddr *) &serv_addr,sizeof(serv_addr)) < 0) 
         error("ERROR connecting");
     
-    char * client_username = welcome_user(sockfd, username);
+    
 
-    if (client_username != NULL) {
+    if (welcome_user(sockfd)) {
         printf("Welcome to the chat server. What would you like to do?\n");
 
         while(!done){
@@ -451,67 +500,61 @@ int main(int argc, char *argv[])
             if(FD_ISSET(sockfd, &readfds) != 0)
             {
                 read_from_server(sockfd, &p);
-                printf("type %d\n", p.type);
-                printf("src %s\n", p.src);
-                printf("dst %s\n", p.dst);
-                printf("len %d\n", p.len);
-                printf("data %s\n", p.data);
+                printf("r_type %d\n", p.type);
+                printf("r_src %s\n", p.src);
+                printf("r_dst %s\n", p.dst);
+                printf("r_len %d\n", p.len);
+                printf("r_data %s\n", p.data);
                 if (p.type == 19) {
-                    printf("You have recieved a chat request from %s." \
-                        "  Would you like to accept the request? [y/n]\n", p.src);
-                    
-                    bool valid = false;
-                    int accept;
-                    while (!valid) {
-                        char input [4];
-                        bzero(input, 4);
-                        fgets(input, 4 ,stdin);
-                        
-                        if (strncmp(input, "Y", 1) == 0 || strncmp(input, "y", 1) == 0) {
-                            accept = CHAT_ACCEPT;
-                            valid = true;
-                        }
-                        else if (strncmp(input, "N", 1) != 0 && strncmp(input, "n", 1) != 0) {
-                            printf("Invalid input. Would you like to accept the request? [y/n]\n");
-                        }
-                        else {
-                            accept = CHAT_REJECT;
-                            valid = true;
-                        }
-                    }
-                    send_packet(sockfd, accept, client_username, "Server", 0, 0, "");
+                    respond_to_request(sockfd, &p);
                 }
-                else if (p.type == 10) {
-                    printf("You have recieved a message from %s in chat %s", p.src, p.dst);
-                    printf("%s\n", p.data);
+                else if (p.type == MSG) {
+                    read_message(&p);
                 }
-
+                else if (p.type == CHAT_ACK) {
+                    printf("You have been added to chat %s\n", p.data);
+                }
+                else if (p.type == CHAT_FAIL) {
+                    printf("Failed to create chat\n");
+                }
+                else if (p.type == MSG_ERROR) {
+                    printf("Falied to send message %d\n", p.msg_id);
+                }
             }
             else if (FD_ISSET(STDIN, &readfds))
             {
                 bzero(buffer,256);
                 fgets(buffer,256,stdin);
                 if (strncmp("List Clients", buffer, 12) == 0) {
-                    send_packet(sockfd, CLIENT_LIST_REQ, client_username, "Server", 0, 0, "");
+                    send_packet(sockfd, CLIENT_LIST_REQ, USERNAME, "Server", 0, 0, "");
                     struct packet p;
                     read_from_server(sockfd, &p);
                     print_clients(&p);
                 }
                 else if (strncmp("List Chats", buffer, 10) == 0) {
-                    send_packet(sockfd, CHAT_LIST_REQ, client_username, "Server", 0, 0, "");
+                    send_packet(sockfd, CHAT_LIST_REQ, USERNAME, "Server", 0, 0, "");
                     struct packet p;
                     read_from_server(sockfd, &p);
                     print_chats(&p);
                 }
                 else if (strncmp("Create Chat", buffer, 11) == 0) {
-                    send_chat_req(client_username, sockfd);
+                    send_chat_req(sockfd);
                 }
                 else if (strncmp("Send Message", buffer, 12) == 0) {
-                    send_message(client_username, sockfd);
+                    send_message(sockfd);
                 }
                 else if (strncmp("Logout", buffer, 6) == 0) {
                     done = true;
-                    logout(sockfd, client_username);
+                    logout(sockfd);
+                }
+                else if (strncmp("Delete Client", buffer, 13) == 0) {
+                    done = true;
+                    send_packet(sockfd, DELETE_USER, USERNAME, "Server", 0, 0, "");
+                    struct packet p;
+                    read_from_server(sockfd, &p);
+                    // if (p.type == 17)
+                    printf("User %s has been deleted.\n", USERNAME);
+                    close(sockfd);
                 }
                 else {
                     printf("Invalid input\n");
@@ -526,94 +569,8 @@ int main(int argc, char *argv[])
     }
 
 
-
-
-
-
-        // while (!done) {
-        //     ret = poll(&fd, 1, 1000); 
-        //     switch (ret) {
-        //         case -1:
-        //             error("ERROR in poll");
-        //             break;
-        //         case 0:
-        //             printf("asking now\n");
-        //             if (!feof(stdin)) {
-        //                 bzero(buffer,256);
-        //                 fgets(buffer,256,stdin);
-        //                 if (strncmp("List Clients", buffer, 12) == 0) {
-        //                     send_packet(sockfd, CLIENT_LIST_REQ, client_username, "Server", 0, 0, "");
-        //                     struct packet p;
-        //                     read_from_server(sockfd, &p);
-        //                     print_clients(&p);
-        //                 }
-        //                 else if (strncmp("List Chats", buffer, 10) == 0) {
-        //                     send_packet(sockfd, CHAT_LIST_REQ, client_username, "Server", 0, 0, "");
-        //                     struct packet p;
-        //                     read_from_server(sockfd, &p);
-        //                     print_chats(&p);
-        //                 }
-        //                 else if (strncmp("Create Chat", buffer, 11) == 0) {
-        //                     send_chat_req(client_username, sockfd);
-        //                     printf("here");
-        //                     // send_packet(sockfd, CREATE_CHAT, client_username, "Server", 0, 0, "");
-        //                     // struct packet p;
-        //                     // read_from_server(sockfd, &p);
-        //                     // printf("and now im here\n");
-        //                 }
-        //                 else if (strncmp("Logout", buffer, 6) == 0) {
-        //                     done = true;
-        //                     logout(sockfd, client_username);
-        //                 }
-        //                 else {
-        //                     printf("Invalid input\n");
-        //                     print_usage();
-        //                }
-        //             }
-        //             break;
-        //         default: 
-        //             read_from_server(sockfd, &p);
-        //             printf("there was a thing here\n");
-        //             break;
-        //     }
-        // }
-    // }
-    //     while(!done) {
-    //         bzero(buffer,256);
-    //         fgets(buffer,256,stdin);
-    //         if (strncmp("List Clients", buffer, 12) == 0) {
-    //             send_packet(sockfd, CLIENT_LIST_REQ, client_username, "Server", 0, 0, "");
-    //             struct packet p;
-    //             read_from_server(sockfd, &p);
-    //             print_clients(&p);
-    //         }
-    //         else if (strncmp("List Chats", buffer, 10) == 0) {
-    //             send_packet(sockfd, CHAT_LIST_REQ, client_username, "Server", 0, 0, "");
-    //             struct packet p;
-    //             read_from_server(sockfd, &p);
-    //             print_chats(&p);
-    //         }
-    //         // else if (strncmp("Create Chat", buffer, 11) == 0) {
-    //         //     send_chat_req(client_username, sockfd);
-    //         //     printf("here");
-    //         //     // send_packet(sockfd, CREATE_CHAT, client_username, "Server", 0, 0, "");
-    //         //     // struct packet p;
-    //         //     // read_from_server(sockfd, &p);
-    //         //     // printf("and now im here\n");
-    //         // }
-    //         else if (strncmp("Logout", buffer, 6) == 0) {
-    //             done = true;
-    //             logout(sockfd, client_username);
-    //         }
-    //         else {
-    //             printf("Invalid input\n");
-    //             print_usage();
-    //        }
-    //     }  
-    // }
     // else {
     //     //TODO Make logout timeout?
-    //     //TODO ask if user wants to try again...
     //     logout(sockfd, client_username);
     // }
     return 0;
