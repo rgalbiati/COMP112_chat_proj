@@ -50,8 +50,12 @@ int numClients(struct clientList *c) {
     return c->numClients;
 }
 
-bool addClient(char *id, int fd, char *pw, struct clientList *c){
+bool addClient(char *id, int fd, char *pw, char *ip, struct clientList *c){
     if (c->numClients == c->maxClients){
+        return false;
+    }
+
+    if (strlen(ip) > 15) {
         return false;
     }
     
@@ -69,8 +73,12 @@ bool addClient(char *id, int fd, char *pw, struct clientList *c){
 
     memcpy(c->clients[c->numClients]->pw, salted_pass, strlen(salted_pass) + 1);
 
+    memset(c->clients[c->numClients]->ip, 0, 16);
+    memcpy(c->clients[c->numClients]->ip, ip, strlen(ip) + 1);
+
     c->clients[c->numClients]->fd = fd;
     c->clients[c->numClients]->logged_in = true;
+
     c->numClients += 1;
     return true;
 }
@@ -141,7 +149,7 @@ bool setfd(char *id, int fd, struct clientList *c){
 }
 
 // THIS NEEDS TO BE ENCRYPTED
-bool logInClient(char *id, char *pw, struct clientList *c) {
+bool logInClient(char *id, char *pw, char *ip, struct clientList *c) {
     int numClients = c->numClients;
     for (int i = 0; i < numClients; i++) {
 
@@ -157,6 +165,11 @@ bool logInClient(char *id, char *pw, struct clientList *c) {
 
             if (strcmp(salted_pass, c->clients[i]->pw) == 0){
                 c->clients[i]->logged_in = true;
+
+                memset(c->clients[i]->ip, 0, sizeof(c->clients[i]->ip));
+                memcpy(c->clients[i]->ip, ip, strlen(ip) + 1);
+
+
                 return true;
             }        
         }

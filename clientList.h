@@ -15,10 +15,12 @@ struct client {
     char salt[16];
     char pw[46];            // this needs to be changed
     int fd;
+    char ip[16];
     bool logged_in;
     int numMessages;
     struct packet mailbox[10];
 };
+
 
 struct clientList {
 	int numClients;
@@ -32,10 +34,10 @@ void *freeClientList(struct clientList *c);
 int numClients(struct clientList *c);
 bool hasClient(char *id, struct clientList *c);
 void removeClient(char *id, struct clientList *c);
-bool addClient(char *id, int fd, char *pw, struct clientList *c);
+bool addClient(char *id, int fd, char *pw, char *ip, struct clientList *c);
 int getfd(char *id, struct clientList *c);
 bool setfd(char *id, int fd, struct clientList *c);
-bool logInClient(char *id, char *pw, struct clientList *c);
+bool logInClient(char *id, char *pw,  char *ip, struct clientList *c);
 void printClients(struct clientList *c);
 bool isLoggedIn(char *id, struct clientList *c);
 void logOutClient(char *id, struct clientList *c);

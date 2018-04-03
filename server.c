@@ -53,7 +53,7 @@ struct __attribute__((__packed__)) header {
 };
 
 bool handle_packet(int fd, struct packet *p, struct clientList *client_list, 
-                   struct chatList *chat_list);
+                   struct chatList *chat_list, char *ip);
 void send_packet(int fd, int type, char *src, char *dst, int len, int msg_id, 
                  char *data);
 void sendClientList(int fd, char *dst, struct clientList *client_list);
@@ -68,6 +68,8 @@ int main (int argc, char* argv[]) {
     fd_set active_fd_set, read_fd_set;
     struct sockaddr_in clientname;
     int numClients = 0, numChats = 0;
+    int len = sizeof(struct sockaddr);
+
 
     if (argc != 2) {
         printf("Please provide a single port number.\n");
@@ -130,7 +132,22 @@ int main (int argc, char* argv[]) {
                         FD_CLR (i, &active_fd_set);
                     }
                     else {
-                        if (!handle_packet(i, &p, client_list, chat_list)) {
+
+                        // struct sockaddr_in* addr = (struct sockaddr_in*)&clientname;
+                        // struct in_addr ipAddr = addr->sin_addr;
+
+                        // char client_ip[INET_ADDRSTRLEN];
+                        // inet_ntop(AF_INET, &ipAddr, client_ip, INET_ADDRSTRLEN);
+                        struct sockaddr_in foo;
+
+                        if (getsockname(i, (struct sockaddr *)&foo, &len) < 0){
+                            printf("ERROR: can't get IP\n");
+                            continue;
+                        } 
+
+                        // printf("client IP: %s\n", inet_ntoa(foo.sin_addr));
+
+                        if (!handle_packet(i, &p, client_list, chat_list, inet_ntoa(foo.sin_addr))) {
                             close(i);
                             FD_CLR(i, &active_fd_set);
                         }
@@ -142,7 +159,8 @@ int main (int argc, char* argv[]) {
 }
 
 bool handle_packet(int fd, struct packet *p, struct clientList *client_list, 
-                   struct chatList *chat_list){
+                   struct chatList *chat_list, char *ip){
+
     print_packet(p);
     printClients(client_list);
 
@@ -163,7 +181,7 @@ bool handle_packet(int fd, struct packet *p, struct clientList *client_list,
 
         // valid client, add & send ack
         else {
-            addClient(p->src, fd, p->data, client_list);
+            addClient(p->src, fd, p->data, ip, client_list);
             send_packet(fd, LOGIN_ACK, "Server", p->src, 0, 0, "");
         }
     } 
@@ -176,7 +194,7 @@ bool handle_packet(int fd, struct packet *p, struct clientList *client_list,
             send_packet(fd, LOGIN_FAIL, "Server", p->src, 0, 0, "");
         } 
 
-        else if (!logInClient(p->src, p->data, client_list)) {
+        else if (!logInClient(p->src, p->data, ip, client_list)) {
             printf("Error: invalid login\n");
             send_packet(fd, LOGIN_FAIL, "Server", p->src, 0, 0, "");
         }
@@ -611,7 +629,7 @@ bool handle_packet(int fd, struct packet *p, struct clientList *client_list,
     // Disconnect ---> behaves like logout
     else if (p->type == 0) {
         logOutByFD(fd, client_list);
-        // return false;
+        return false;
     }
 
     // Unknown message type -- remove client + delete from chats
