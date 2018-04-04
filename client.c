@@ -24,25 +24,25 @@ const static int PASS_LEN = 30;
 const int BUFSIZE = 512;
 const int DATA_SIZE = 400;
 
-const int NEW_USER = 1;         // Write --DONE
-const int LOGIN = 2;            // Write --DONE
-const int LOGOUT = 3;           // W --DONE
-const int LOGIN_ACK = 4;        // R --DONE
-const int LOGIN_FAIL = 5;       // R --DONE
-const int CLIENT_LIST_REQ = 6;  // W --DONE
-const int CHAT_LIST_REQ = 7;    // W
-const int CLIENT_LIST = 8;      // R --DONE
-const int CHAT_LIST = 9;        // R
-const int MSG = 10;             // W --DONEish
-const int CREATE_CHAT = 11;     // W --DONE
-const int CHAT_ACK = 12;        // R --DONE
-const int CHAT_FAIL = 13;       // R --DONE
-const int CHAT_ACCEPT = 14;     // W --DONE
-const int CHAT_REJECT = 15;     // W --DONE
-const int DELETE_USER = 16;     // W --DONE
-const int DELETE_ACK = 17;      // R --DONEish
-const int MSG_ERROR = 18;       // R 
-const int CHAT_REQ = 19;        // W --DONEish
+const int NEW_USER = 1;         
+const int LOGIN = 2;            
+const int LOGOUT = 3;           
+const int LOGIN_ACK = 4;        
+const int LOGIN_FAIL = 5;       
+const int CLIENT_LIST_REQ = 6;  
+const int CHAT_LIST_REQ = 7;    
+const int CLIENT_LIST = 8;      
+const int CHAT_LIST = 9;        
+const int MSG = 10;             
+const int CREATE_CHAT = 11;     
+const int CHAT_ACK = 12;        
+const int CHAT_FAIL = 13;       
+const int CHAT_ACCEPT = 14;     
+const int CHAT_REJECT = 15;     
+const int DELETE_USER = 16;     
+const int DELETE_ACK = 17;      
+const int MSG_ERROR = 18;       
+const int CHAT_REQ = 19;        
 
 char USERNAME[USER_LEN];
 
@@ -82,15 +82,37 @@ void print_chats (struct packet *packet)
 {
     int cursor = 0;
     char* buf = packet->data;
+    int i = 0;
 
+    if (packet->len == 0) {
+        printf("You do not have any chats right now.  Type \"Create Chat\" "\
+            "to start a new one\n");
+        return;
+    }
+
+    printf("Chat ID : ");
     printf("%s\n", buf);
+    cursor += strlen(buf) + 1;
+    buf += strlen(buf) + 1;
 
-    // while (cursor < packet.len)
-    // {
-    //     printf("%s", buf);
-    //     cursor += strlen(buf) + 1;
-    //     buf += strlen(buf) + 1;
-    // }
+    while (cursor < packet->len) {
+        if (buf[0] == '\n') {
+            buf++;
+            cursor++;
+            if (cursor >= (packet->len - 2)) {
+                break;
+            }
+            printf("Chat ID : ");
+            i = 0;
+        }
+        else {
+            printf("%d) ", i);
+            i++;
+        }
+        printf("%s\n", buf);
+        cursor += strlen(buf) + 1;
+        buf += strlen(buf) + 1;
+    }
 }
 
 void error(const char *msg)
@@ -245,12 +267,6 @@ void logout(int sockfd)
 void send_packet(int sockfd, int type, char *src, char *dst, int len, int msg_id, 
                  char *data)
 {
-    printf("s_type %d\n", type);
-    printf("s_src %s\n", src);
-    printf("s_dst %s\n", dst);
-    printf("s_len %d\n", len);
-    printf("s_data %s\n", data);
-
     char buffer[256];
     int n;
     struct header p;
@@ -349,9 +365,7 @@ void send_chat_req(int sockfd)
     int num_clients;
     char username[USER_LEN];
     int c;
-    // char clients[num_clients][USER_LEN + 1]; is declared below 
-    // then create header?
-    // then send clients one by one?
+    
     while (!valid) {
         printf("How many users will you include in your chat?\n");
         int result = scanf("%d", &num_clients);
@@ -409,13 +423,18 @@ void send_message (int sockfd)
     printf("Chat ID : ");
     bzero(buffer,256);
     fgets(buffer,256,stdin);
-    char* id = buffer;
-    id = sanitize_input(id);
+    char* tmp;
+    tmp = sanitize_input(buffer);
+    char id[256];
+    bzero(id, 256);
+    memcpy(id, tmp, strlen(tmp) + 1);
+    printf("id before is %s\n", id);
     printf("New Message : ");
     bzero(buffer,256);
     fgets(buffer,256,stdin);
 
-    // not sure what to do with message id...
+    // TODO not sure what to do with message id...
+    printf("id after is %s\n", id);
     send_packet(sockfd, MSG, USERNAME, id, strlen(buffer) + 1, 
                             1, buffer);
 }
@@ -450,8 +469,7 @@ void respond_to_request (int sockfd, struct packet *p)
 
 void read_message(struct packet *p)
 {
-    printf("%s : %s : ", p->src, p->dst);
-    printf("%s\n", p->data);
+    printf("Message from %s to chat %s : %s", p->src, p->dst, p->data);
 }
 
 int main(int argc, char *argv[])
@@ -460,12 +478,8 @@ int main(int argc, char *argv[])
     struct sockaddr_in serv_addr;
     struct hostent *server;
     bool done = false;
-    // char username [USER_LEN];
     fd_set writefds;
     fd_set readfds;
-    struct pollfd fd;
-    fd.fd = sockfd; // socket handler 
-    fd.events = POLLIN;
     struct packet p;
 
     char buffer[256];
@@ -506,11 +520,6 @@ int main(int argc, char *argv[])
             if(FD_ISSET(sockfd, &readfds) != 0)
             {
                 read_from_server(sockfd, &p);
-                printf("r_type %d\n", p.type);
-                printf("r_src %s\n", p.src);
-                printf("r_dst %s\n", p.dst);
-                printf("r_len %d\n", p.len);
-                printf("r_data %s\n", p.data);
                 if (p.type == 19) {
                     respond_to_request(sockfd, &p);
                 }
@@ -525,6 +534,11 @@ int main(int argc, char *argv[])
                 }
                 else if (p.type == MSG_ERROR) {
                     printf("Falied to send message %d\n", p.msg_id);
+                }
+                else if (p.type == 0) {
+                    printf("Server disconnected\n");
+                    close(sockfd);
+                    break;
                 }
             }
             else if (FD_ISSET(STDIN, &readfds))
@@ -556,11 +570,25 @@ int main(int argc, char *argv[])
                 else if (strncmp("Delete Client", buffer, 13) == 0) {
                     done = true;
                     send_packet(sockfd, DELETE_USER, USERNAME, "Server", 0, 0, "");
-                    struct packet p;
-                    read_from_server(sockfd, &p);
-                    // if (p.type == 17)
-                    printf("User %s has been deleted\n", USERNAME);
-                    close(sockfd);
+                    bool deleted = false;
+                    int tries = 0;
+                    while (!deleted) {
+                        struct packet p;
+                        read_from_server(sockfd, &p);
+                        if (p.type == 17) {
+                            printf("User %s has been deleted\n", USERNAME);
+                            close(sockfd);
+                            deleted = true;
+                        }
+                        else {
+                            tries++;
+                            if (tries > 5) {
+                                printf("Failed to delete client. Logging out now. Login later to try again\n");
+                                logout(sockfd);
+                            }
+                            send_packet(sockfd, DELETE_USER, USERNAME, "Server", 0, 0, "");
+                        }
+                    }
                 }
                 else if (strncmp("Print Usage", buffer, 11) == 0) {
                     print_usage();
