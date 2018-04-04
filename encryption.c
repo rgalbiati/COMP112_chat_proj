@@ -109,14 +109,28 @@ void encrypted_write(int fd, int type, char *src, char *dst, int len, int msg_id
         // printf("%s\n", data);
         // printf("%s\n", data);
 
+        unsigned char enc_out[600];
+    	AES_KEY enc_key;
 
-        int n = encrypt(data, strlen(data), aad, strlen(aad), key, iv, strlen(iv), encrypted_data, tag);
-        p.len = n;
+    	AES_set_encrypt_key(key, 128, &enc_key);
+    	AES_encrypt(data, enc_out, &enc_key);      
+
+    	// AES_set_decrypt_key(key,128,&dec_key);
+    	// AES_decrypt(enc_out, dec_out, &dec_key);
+
+        // int n = encrypt(data, strlen(data), aad, strlen(aad), key, iv, strlen(iv), encrypted_data, tag);
+        int enc_len = 0;
+        for(int i=0; *(enc_out+i)!=0x00; i++){
+        	enc_len += 1;
+        }
+       
+        p.len = enc_len;
+
         write(fd, (char *) &p, sizeof(p));
 
         // Write data
         if (len > 0) {
-            write(fd, encrypted_data, n);
+            write(fd, enc_out, enc_len);
         }
     } 
 
