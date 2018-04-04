@@ -211,7 +211,7 @@ bool handle_packet(int fd, struct packet *p, struct clientList *client_list,
                     struct packet p = cl->mailbox[i];
                     send_packet(fd, p.type, p.src, p.dst, p.len, p.msg_id, p.data);
                 }
-
+                emptyMailbox(cl);
             }
         }
     }

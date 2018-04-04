@@ -52,5 +52,6 @@ char *cityClientList(char *id, char *city, struct clientList *c);
 
 // client functions
 int mailboxSize(struct client *c);
+void emptyMailbox(struct client *c)
 
 #endif

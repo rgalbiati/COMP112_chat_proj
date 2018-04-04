@@ -447,6 +447,11 @@ int mailboxSize(struct client *c){
     return c->numMessages;
 }
 
+void emptyMailbox(struct client *c)
+{
+    cl->numMessages = 0;
+}
+
 // FOR TESTING
 
 // int main() {
