@@ -48,10 +48,10 @@ void writeClientList(int fd, struct clientList *c);
 struct client *getClient(char *id, struct clientList *c);
 void addPacketMailbox(char *id, struct packet p, struct clientList *c);
 void logOutByFD(int fd, struct clientList *c);
-char *cityClientList(char *id, char *city, struct clientList *c);
+char *getClientCountry(char *id, struct clientList *c);
+char *getClientCity(char *id, struct clientList *c);
 
 // client functions
 int mailboxSize(struct client *c);
-void emptyMailbox(struct client *c);
 
 #endif

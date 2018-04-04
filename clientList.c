@@ -116,6 +116,8 @@ char *getCountry(char *data){
             char *entry = token;
             token = strtok(entry, ":");
             token = strtok(NULL, ",");
+            entry = token;
+            token = strtok(entry, "\"");
 
             // char *city = malloc(strlen(token) + 1);
             // printf("found country: %s\n", token);
@@ -141,6 +143,8 @@ char *getCity(char *data){
             char *entry = token;
             token = strtok(entry, ":");
             token = strtok(NULL, ",");
+            entry = token;
+            token = strtok(entry, "\"");
 
             // char *city = malloc(strlen(token) + 1);
             // printf("found city: %s\n", token);
@@ -426,30 +430,27 @@ void addPacketMailbox(char *id, struct packet p, struct clientList *c){
     }
 }
 
-// char *cityClientList(char *id, char *city, struct clientList *c){
-//     int numClients = c->numClients, cityMatches = 0;
-//     char *cityClientList = malloc(LOC_LEN * 4);
-//     memset(cityClientList, 0, LOC_LEN * 4);
-//     int bytes = 0;
+char *getClientCountry(char *id, struct clientList *c){
+    int numClients = c->numClients;
+    for (int i = 0; i < numClients; i++){
+        if (strcmp(id, c->clients[i]->id) == 0){
+            return c->clients[i]->country;
+        }
+    }
+}
 
-//     for (int i = 0; i < numClients; i++){
-//         // found a match (not self)
-//         if (strcmp(c->clients[i]->city, city) == 0 && strcmp(c->clients[i]->id, id) != 0){
-            
-//         }
-//     }
-
-//     return cityClientList;
-// }
+char *getClientCity(char *id, struct clientList *c){
+    int numClients = c->numClients;
+    for (int i = 0; i < numClients; i++){
+        if (strcmp(id, c->clients[i]->id) == 0){
+            return c->clients[i]->city;
+        }
+    }
+}
 
 
 int mailboxSize(struct client *c){
     return c->numMessages;
-}
-
-void emptyMailbox(struct client *c)
-{
-    c->numMessages = 0;
 }
 
 // FOR TESTING

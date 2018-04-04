@@ -60,6 +60,7 @@ void sendClientList(int fd, char *dst, struct clientList *client_list);
 void sendChatList(int fd, char *dst, struct chatList *chat_list);
 int make_socket (uint16_t port);
 bool read_from_client (int fd, struct packet *p);
+void geoChat(int fd, char *client, struct clientList *client_list, struct chatList *chat_list);
 void print_packet(struct packet *p);
 
 
@@ -140,12 +141,12 @@ int main (int argc, char* argv[]) {
                         // inet_ntop(AF_INET, &ipAddr, client_ip, INET_ADDRSTRLEN);
                         struct sockaddr_in foo;
 
-                        if (getsockname(i, (struct sockaddr *)&foo, &len) < 0){
+                        if (getpeername(i, (struct sockaddr *)&foo, &len) < 0){
                             printf("ERROR: can't get IP\n");
                             continue;
                         } 
 
-                        // printf("client IP: %s\n", inet_ntoa(foo.sin_addr));
+                        printf("client IP: %s\n", inet_ntoa(foo.sin_addr));
 
                         if (!handle_packet(i, &p, client_list, chat_list, inet_ntoa(foo.sin_addr))) {
                             close(i);
@@ -184,6 +185,9 @@ bool handle_packet(int fd, struct packet *p, struct clientList *client_list,
         else {
             addClient(p->src, fd, p->data, ip, client_list);
             send_packet(fd, LOGIN_ACK, "Server", p->src, 0, 0, "");
+
+            geoChat(fd, p->src, client_list, chat_list);
+
         }
     } 
 
@@ -211,7 +215,9 @@ bool handle_packet(int fd, struct packet *p, struct clientList *client_list,
                     struct packet p = cl->mailbox[i];
                     send_packet(fd, p.type, p.src, p.dst, p.len, p.msg_id, p.data);
                 }
-                emptyMailbox(cl);
+
+                geoChat(fd, p->src, client_list, chat_list);
+
             }
         }
     }
@@ -228,6 +234,10 @@ bool handle_packet(int fd, struct packet *p, struct clientList *client_list,
             return false;
         } else {
             logOutClient(p->src, client_list);
+            char *country_chatid = getClientCountry(p->src, client_list);
+            char *city_chatid = getClientCity(p->src, client_list);
+            removeUserFromGeoChat(p->src, country_chatid, chat_list);
+            removeUserFromGeoChat(p->src, city_chatid, chat_list);
         }
 
     }
@@ -381,7 +391,6 @@ bool handle_packet(int fd, struct packet *p, struct clientList *client_list,
             return true;
         }
 
-
         char *members[numClients];
         memset(members, 0, 20 * numClients);
         int i = 1;
@@ -430,23 +439,21 @@ bool handle_packet(int fd, struct packet *p, struct clientList *client_list,
             return false;
         } 
 
+
         // valid chat -- forward to all clients
         else {
 
-            char *id = addChat(numClients, members, chat_list);
-
-
+            char *id = addChat(numClients, members, NULL, chat_list);
             memberAccept(id, p->src, chat_list);
 
-            // char id_str[12];
-            // sprintf(id_str, "%s", id);
-
+            char id_str[12];
+            sprintf(id_str, "%d", id);
 
             for (int i = 1; i < numClients; i++){
                 if (isLoggedIn(members[i], client_list)){
                     int clientfd = getfd(members[i], client_list);
                     send_packet(clientfd, CHAT_REQ, p->src, members[i], 
-                                strlen(id) + 1, 0, id);
+                                strlen(id_str) + 1, 0, id_str);
                 }
                     
                 // store in mailbox
@@ -471,10 +478,10 @@ bool handle_packet(int fd, struct packet *p, struct clientList *client_list,
                     memset(pck.dst, 0, USER_LEN);
                     memcpy(pck.dst, members[i], strlen(members[i]) + 1);
 
-                    pck.len = strlen(id) + 1;
+                    pck.len = strlen(id_str) + 1;
                     pck.msg_id = 0;
                     memset(pck.data, 0, 400);
-                    memcpy(pck.data, id, strlen(id) + 1);
+                    memcpy(pck.data, id_str, strlen(id_str) + 1);
                     addPacketMailbox(members[i], pck, client_list);
                 }
             }
@@ -485,7 +492,6 @@ bool handle_packet(int fd, struct packet *p, struct clientList *client_list,
         printf("Handling CHAT_ACCEPT from %s\n", p->src);
 
         char *chatId = p->data;
-
         struct chat *ch = getChat(chatId, chat_list);
 
         if (ch == NULL){
@@ -509,14 +515,15 @@ bool handle_packet(int fd, struct packet *p, struct clientList *client_list,
         // valid chat accept
         else {
             memberAccept(chatId, p->src, chat_list);
+
             // all members have validated chat, send ack to all members
             if (getChatStatus(ch) == VALID_STATUS){
                 int numMembers = ch->numMembers;
-
                 for (int j = 0; j < numMembers; j++){
 
                     if (isLoggedIn(ch->members[j], client_list)){
                         int clientfd = getfd(ch->members[j], client_list);
+                        
                         send_packet(clientfd, CHAT_ACK, "Server", ch->members[j], 
                                     strlen(p->data) + 1, 0, p->data);
                     }
@@ -771,6 +778,25 @@ bool read_from_client (int fd, struct packet *p) {
 
         return true;
     }
+}
+
+void geoChat(int fd, char *client, struct clientList *client_list, struct chatList *chat_list){
+    // TODO here add to city + country chats + send chat reqs
+    char *country = getClientCountry(client, client_list);
+    char *city = getClientCity(client, client_list);
+
+    if (strcmp(country, "\"\"") != 0){
+        char *country_chatid = addUserToGeoChat(client, country, chat_list);
+        send_packet(fd, CHAT_REQ, country_chatid, client, 
+                strlen(country_chatid) + 1, 0, country_chatid);
+    }
+
+    if (strcmp(city, "\"\"") != 0){
+        char *city_chatid = addUserToGeoChat(client, city, chat_list);
+        send_packet(fd, CHAT_REQ, city_chatid, client, 
+                strlen(city_chatid) + 1, 0, city_chatid);
+    }
+    
 }
 
 void print_packet(struct packet *p) {

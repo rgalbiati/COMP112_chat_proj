@@ -2,7 +2,7 @@
 #define CHAT_H
 
 struct chat {
-    char id[20];
+    char id[40];
     int chatStatus;			  // -1 - unset, 0 - valid, 1 - pending 
     // bool public;			  
     int numMembers;			  
@@ -20,7 +20,7 @@ struct chatList {
 struct chatList *newChatList();
 void freeChatList(struct chatList *c);
 bool existsChat(char *chat_id, struct chatList *c);
-char *addChat(int numMembers, char **members, struct chatList *c);
+char *addChat(int numMembers, char **members, char *id, struct chatList *c);
 bool removeChat(char *chat_id, struct chatList *c);
 struct chat *getChat(char *chat_id, struct chatList *c);
 int memberAccept(char *id, char *client, struct chatList *c);
@@ -28,6 +28,10 @@ void deleteChatsWithMember(char *member, struct chatList *c);
 void writeChatList(int fd, char *client, struct chatList *c);
 int getChatListLen(char *client, struct chatList *c);
 void printChats(struct chatList *c) ;
+bool addUserToChat(char *client, char *chat_id, struct chatList *c);
+bool removeUserFromChat(char *client, char *chat_id, struct chatList *c);
+char *addUserToGeoChat(char *client, char *location, struct chatList *c);
+void removeUserFromGeoChat(char *client, char *location, struct chatList *c);
 
 // Chat functions
 int numMembersChat(struct chat *ch);
