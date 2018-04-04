@@ -87,11 +87,14 @@ char *addChat(int numMembers, char **members, struct chatList *c) {
 	c->chats[chatIndex]->numMembers = numMembers;
 	// c->chats[chatIndex]->public = isPublic;
 	memset(c->chats[chatIndex]->id, 0, 20);
-	sprintf(c->chats[chatIndex]->id, "%d", chatIndex);
+	char tmp[20];
+	sprintf(tmp, "%d", chatIndex);
+	memcpy(c->chats[chatIndex]->id, tmp, strlen(tmp));
 
 	c->chats[chatIndex]->chatStatus = PENDING_STATUS;
 
 	c->numChats += 1;
+
 	return c->chats[chatIndex]->id;
 }
 
@@ -125,7 +128,7 @@ bool removeChat(char *chat_id, struct chatList *c) {
 struct chat *getChat(char *chat_id, struct chatList *c) {
 	int numChats = c->numChats;
 	for (int i = 0; i < numChats; i++) {
-		if (strcmp(c->chats[i]->id, chat_id)) {
+		if (strcmp(c->chats[i]->id, chat_id) == 0) {
 			return c->chats[i];
 		}
 	}
@@ -213,7 +216,7 @@ void printChats(struct chatList *c) {
 	for (int i = 0; i < numChats; i++) {
 		int numMembers = c->chats[i]->numMembers;
 	
-		printf("%d) id: %d, %d members, ", i, c->chats[i]->id, numMembers);
+		printf("%d) id: %s, %d members, ", i, c->chats[i]->id, numMembers);
 	
 		
 		// if (c->chats[i]->public == true) {

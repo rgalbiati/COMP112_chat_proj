@@ -430,21 +430,23 @@ bool handle_packet(int fd, struct packet *p, struct clientList *client_list,
             return false;
         } 
 
-
         // valid chat -- forward to all clients
         else {
 
             char *id = addChat(numClients, members, chat_list);
+
+
             memberAccept(id, p->src, chat_list);
 
-            char id_str[12];
-            sprintf(id_str, "%d", id);
+            // char id_str[12];
+            // sprintf(id_str, "%s", id);
+
 
             for (int i = 1; i < numClients; i++){
                 if (isLoggedIn(members[i], client_list)){
                     int clientfd = getfd(members[i], client_list);
                     send_packet(clientfd, CHAT_REQ, p->src, members[i], 
-                                strlen(id_str) + 1, 0, id_str);
+                                strlen(id) + 1, 0, id);
                 }
                     
                 // store in mailbox
@@ -469,10 +471,10 @@ bool handle_packet(int fd, struct packet *p, struct clientList *client_list,
                     memset(pck.dst, 0, USER_LEN);
                     memcpy(pck.dst, members[i], strlen(members[i]) + 1);
 
-                    pck.len = strlen(id_str) + 1;
+                    pck.len = strlen(id) + 1;
                     pck.msg_id = 0;
                     memset(pck.data, 0, 400);
-                    memcpy(pck.data, id_str, strlen(id_str) + 1);
+                    memcpy(pck.data, id, strlen(id) + 1);
                     addPacketMailbox(members[i], pck, client_list);
                 }
             }
@@ -483,6 +485,7 @@ bool handle_packet(int fd, struct packet *p, struct clientList *client_list,
         printf("Handling CHAT_ACCEPT from %s\n", p->src);
 
         char *chatId = p->data;
+
         struct chat *ch = getChat(chatId, chat_list);
 
         if (ch == NULL){
@@ -506,15 +509,14 @@ bool handle_packet(int fd, struct packet *p, struct clientList *client_list,
         // valid chat accept
         else {
             memberAccept(chatId, p->src, chat_list);
-
             // all members have validated chat, send ack to all members
             if (getChatStatus(ch) == VALID_STATUS){
                 int numMembers = ch->numMembers;
+
                 for (int j = 0; j < numMembers; j++){
 
                     if (isLoggedIn(ch->members[j], client_list)){
                         int clientfd = getfd(ch->members[j], client_list);
-                        
                         send_packet(clientfd, CHAT_ACK, "Server", ch->members[j], 
                                     strlen(p->data) + 1, 0, p->data);
                     }
