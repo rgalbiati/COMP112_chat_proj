@@ -16,6 +16,7 @@ struct client {
     char pw[46];            // this needs to be changed
     int fd;
     char ip[16];
+    char country[40];
     bool logged_in;
     int numMessages;
     struct packet mailbox[10];

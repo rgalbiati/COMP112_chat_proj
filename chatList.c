@@ -26,8 +26,8 @@ struct chatList *newChatList() {
 
 	for (int i = 0; i < MAX_CHATS; i++) {
 		c->chats[i] = malloc(sizeof(struct chat));
-		c->chats[i]->id = -1;
-		c->chats[i]->public = false;
+		memset(c->chats[i]->id, 0, 20);
+		// c->chats[i]->public = false;
 		c->chats[i]->numMembers = 0;
 		c->chats[i]->chatStatus = -1;
 		for (int j = 0; j < 5; j++) {
@@ -63,10 +63,10 @@ int getChatStatus(struct chat *ch){
 	return ch->chatStatus;
 }
 
-bool existsChat(int chat_id, struct chatList *c){
+bool existsChat(char *chat_id, struct chatList *c){
 	int numChats = c->numChats;
 	for (int i = 0; i < numChats; i++) {
-		if (c->chats[i]->id == chat_id) {
+		if (strcmp(c->chats[i]->id, chat_id) == 0) {
 			return true;
 		}
 	}
@@ -75,9 +75,9 @@ bool existsChat(int chat_id, struct chatList *c){
 }
 
 // returns id
-int addChat(bool isPublic, int numMembers, char **members, struct chatList *c) {
+char *addChat(int numMembers, char **members, struct chatList *c) {
 	if (c->numChats == c->maxChats || numMembers > 5) {
-		return -1;
+		return "";
 	}
 	int chatIndex = c->numChats;
 	for (int i = 0; i < numMembers; i++) {
@@ -85,23 +85,26 @@ int addChat(bool isPublic, int numMembers, char **members, struct chatList *c) {
 		c->chats[chatIndex]->memberStatus[i] = PENDING_STATUS;
 	}
 	c->chats[chatIndex]->numMembers = numMembers;
-	c->chats[chatIndex]->public = isPublic;
-	c->chats[chatIndex]->id = chatIndex;
+	// c->chats[chatIndex]->public = isPublic;
+	memset(c->chats[chatIndex]->id, 0, 20);
+	sprintf(c->chats[chatIndex]->id, "%d", chatIndex);
+
 	c->chats[chatIndex]->chatStatus = PENDING_STATUS;
 
 	c->numChats += 1;
-	return chatIndex;
+	return c->chats[chatIndex]->id;
 }
 
-bool removeChat(int chat_id, struct chatList *c) {
+bool removeChat(char *chat_id, struct chatList *c) {
 	int numChats = c->numChats;
 	for (int i = 0; i < numChats; i++) {
-		if (c->chats[i]->id == chat_id) {
+		if (strcmp(c->chats[i]->id, chat_id) == 0) {
 			// move last element into slot i to save space
 			if (i != numChats - 1) {
-				c->chats[i]->id = c->chats[numChats - 1]->id;
+				memset(c->chats[i]->id, 0, 20);
+				memcpy(c->chats[i]->id, c->chats[numChats - 1]->id, 20);
 				c->chats[i]->chatStatus = c->chats[numChats - 1]->chatStatus;
-				c->chats[i]->public = c->chats[numChats - 1]->public;
+				// c->chats[i]->public = c->chats[numChats - 1]->public;
 				c->chats[i]->numMembers = c->chats[numChats - 1]->numMembers;
 
 				int nm = c->chats[numChats - 1]->numMembers;
@@ -119,10 +122,10 @@ bool removeChat(int chat_id, struct chatList *c) {
 	return false;
 }
 
-struct chat *getChat(int chat_id, struct chatList *c) {
+struct chat *getChat(char *chat_id, struct chatList *c) {
 	int numChats = c->numChats;
 	for (int i = 0; i < numChats; i++) {
-		if (c->chats[i]->id == chat_id) {
+		if (strcmp(c->chats[i]->id, chat_id)) {
 			return c->chats[i];
 		}
 	}
@@ -133,12 +136,14 @@ int getChatListLen(char *client, struct chatList *c){
 	int len = 0;
 	int numChats = c->numChats;
 	for (int i = 0; i < numChats; i++){
-		if (isPublic(c->chats[i]) || isMemberChat(client, c->chats[i])){
+		if (isMemberChat(client, c->chats[i])){
 			struct chat *ch = c->chats[i];
+			len += strlen(ch->id) + 2;
 			int numMembers = ch->numMembers;
 			for (int j = 0; j < numMembers; j++){
-				len += strlen(ch->members[j]+ 1);
+				len += strlen(ch->members[j])+ 1;
 			}
+			len += 1;
 		}
 	}
 	return len;
@@ -147,8 +152,10 @@ int getChatListLen(char *client, struct chatList *c){
 void writeChatList(int fd, char *client, struct chatList *c){
 	int numChats = c->numChats;
 	for (int i = 0; i < numChats; i++){
-		if (isPublic(c->chats[i]) || isMemberChat(client, c->chats[i])){
+		if (isMemberChat(client, c->chats[i])){
 			struct chat *ch = c->chats[i];
+			write(fd, ch->id, strlen(ch->id) + 1);
+			
 			int numMembers = ch->numMembers;
 			for (int j = 0; j < numMembers; j++){
 				write(fd, ch->members[j], strlen(ch->members[j]) + 1);
@@ -172,10 +179,10 @@ bool isMemberChat(char *client, struct chat *ch) {
 
 
 // updates member within chat & returns overall chat status
-int memberAccept(int id, char *client, struct chatList *c) {
+int memberAccept(char *id, char *client, struct chatList *c) {
 	int numChats = c->numChats;
 	for (int i = 0; i < numChats; i++){
-		if (c->chats[i]->id == id){
+		if (strcmp(c->chats[i]->id, id) == 0){
 			int numMembers = c->chats[i]->numMembers; 
 
 			// valid client
@@ -209,11 +216,11 @@ void printChats(struct chatList *c) {
 		printf("%d) id: %d, %d members, ", i, c->chats[i]->id, numMembers);
 	
 		
-		if (c->chats[i]->public == true) {
-			printf("public, ");
-		} else {
-			printf("private, ");
-		}
+		// if (c->chats[i]->public == true) {
+		// 	printf("public, ");
+		// } else {
+		// 	printf("private, ");
+		// }
 
 		if (c->chats[i]->chatStatus == VALID_STATUS) {
 			printf("status: valid");
@@ -245,9 +252,6 @@ void deleteChatsWithMember(char *member, struct chatList *c){
 
 }
 
-bool isPublic(struct chat *ch) {
-	return ch->public;
-}
 
 // int main(){
 // 	printf("CHAT TEST\n");

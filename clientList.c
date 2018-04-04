@@ -2,9 +2,10 @@
 #include <stdio.h>
 #include <stdbool.h>
 #include <string.h>
-// #include <sys/socket.h>
-// #include <sys/types.h>
+#include <sys/socket.h>
+#include <sys/types.h>
 #include <unistd.h>
+#include <netdb.h>
 #include "clientList.h"
 
 const static int USER_LEN = 20;
@@ -29,6 +30,7 @@ struct clientList *newClientList() {
         memset(c->clients[i]->id, 0, USER_LEN);
         memset(c->clients[i]->pw, 0, PASS_LEN + SALT_LEN);
         memset(c->clients[i]->salt, 0, SALT_LEN);
+        memset(c->clients[i]->country, 0, 40);
         c->clients[i]->fd = -1;
         c->clients[i]->logged_in = false;
         c->clients[i]->numMessages = 0;
@@ -76,11 +78,101 @@ bool addClient(char *id, int fd, char *pw, char *ip, struct clientList *c){
     memset(c->clients[c->numClients]->ip, 0, 16);
     memcpy(c->clients[c->numClients]->ip, ip, strlen(ip) + 1);
 
+    memset(c->clients[c->numClients]->country, 0, 40);
+    // char *country = 
+
     c->clients[c->numClients]->fd = fd;
     c->clients[c->numClients]->logged_in = true;
 
     c->numClients += 1;
     return true;
+}
+
+
+char *getCountry(char *ip){
+    int portno = 80, n, BIG_BUF = 1024;
+    struct sockaddr_in serv_addr;
+    struct hostent *server;
+    int sockfd = socket(AF_INET, SOCK_STREAM, 0);
+
+    if (sockfd < 0){
+        perror("Error opening socket to freegeoip.net\n.");
+        return "";
+    }
+
+    server = gethostbyname("ip-api.com");
+    if (server == NULL){
+        perror("No such host.\n");
+        return "";
+    }
+
+    bzero((char *) &serv_addr, sizeof(serv_addr));
+    serv_addr.sin_family = AF_INET;
+    bcopy((char *)server->h_addr, 
+         (char *)&serv_addr.sin_addr.s_addr,
+         server->h_length);
+    serv_addr.sin_port = htons(portno);
+
+    if (connect(sockfd,(struct sockaddr *) &serv_addr,sizeof(serv_addr)) < 0) {
+        perror("Error connecting to ip-api.com\n");
+        return "";
+    }
+
+    char *header1 = "GET /json/";
+    char *header2 = " HTTP/1.0\r\nHost: ip-api.com\r\n\r\n";
+    int msg_size = strlen(header1) + strlen(ip) + 1;
+    char *msg = malloc(msg_size);
+    memset(msg, 0, msg_size);
+
+    strcat(msg, header1);
+    strcat(msg, ip);
+    strcat(msg, header2);
+
+    n = write(sockfd, msg, strlen(msg));
+
+    if (n < 0) {
+        perror("Error writing to ip-api.com\n");
+        return "";
+    }
+
+    char buffer[BIG_BUF];
+    memset(buffer, 0, BIG_BUF);
+
+    n = read(sockfd, buffer, BIG_BUF);
+    if (n < 0) {
+        perror("Error reading from freegeoip.net\n");
+        return "";
+    }
+    // printf("BUFFER:\n%s\n",buffer);
+
+    int i = 0, start_i, end_i;
+
+    char *token = NULL;
+    token = strtok(buffer, "\n\n");
+    while(token){
+        // printf("TOKEN\n%s\n", token);
+        if (token[0] == '{') break;
+        token = strtok(NULL, "\n\n");
+    }
+    // printf("FINAL TOKEN?\n%s\n", token);
+
+    char *json = token;
+    token = strtok(json, ",");
+    while(token){
+        if (token[i] == '\"' && token[i + 1] == 'c' && token[i+2] == 'i' &&
+            token[i+3] == 't' && token[i+4] == 'y') {
+            break;
+        } 
+        token = strtok(NULL, ",");
+    }
+
+    char *entry = token;
+    token = strtok(entry, ":");
+    token = strtok(NULL, ",");
+
+    char *city = malloc(strlen(token) + 1);
+    strcpy(city, token);
+
 }
 
 bool hasClient(char *id, struct clientList *c) {
@@ -200,7 +292,7 @@ void printClients(struct clientList *c) {
     printf("CLIENT LIST:\n");
     int numClients = c->numClients;
     for (int i = 0; i < numClients; i++) {
-        printf("%d) %s : %d : ", i, c->clients[i]->id, c->clients[i]->fd);
+        printf("%d) %s : %d : %s : ", i, c->clients[i]->id, c->clients[i]->fd, c->clients[i]->ip);
          // printf("%d) %s : %s : %d : ", i, c->clients[i]->id, c->clients[i]->pw, c->clients[i]->fd);
          if (c->clients[i]->logged_in){
             printf("online\n");

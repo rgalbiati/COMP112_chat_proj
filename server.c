@@ -163,6 +163,7 @@ bool handle_packet(int fd, struct packet *p, struct clientList *client_list,
 
     print_packet(p);
     printClients(client_list);
+    printChats(chat_list);
 
     if (p->type == NEW_USER){
         printf("Handling NEW_USER from %s\n", p->src);
@@ -272,8 +273,8 @@ bool handle_packet(int fd, struct packet *p, struct clientList *client_list,
     }
     
     else if (p->type == MSG){
-        int chatId = atoi(p->dst);
-        printf("Handling MSG from %s to chat %d\n", p->src, p->dst);
+        char *chatId = p->dst;
+        printf("Handling MSG from %s to chat %s\n", p->src, p->dst);
         struct chat *c = getChat(chatId, chat_list);
 
         // source must be logged in
@@ -325,7 +326,7 @@ bool handle_packet(int fd, struct packet *p, struct clientList *client_list,
                 // send if logged in
                 if (isLoggedIn(c->members[j], client_list)){
                     int clientfd = getfd(c->members[j], client_list);
-                    send_packet(clientfd, MSG, p->src, c->members[j], p->len, 
+                    send_packet(clientfd, MSG, p->src, p->dst, p->len, 
                             p->msg_id, p->data);
                 } 
 
@@ -342,7 +343,7 @@ bool handle_packet(int fd, struct packet *p, struct clientList *client_list,
                     memset(pck.src, 0, USER_LEN);
                     memcpy(pck.src, p->src, strlen(p->src) + 1);
                     memset(pck.dst, 0, USER_LEN);
-                    memcpy(pck.dst, c->members[j], strlen(c->members[j]) + 1);
+                    memcpy(pck.dst, p->dst, strlen(p->dst) + 1);
                     pck.len = p->len;
                     pck.msg_id = p->msg_id;
                     memset(pck.data, 0, 400);
@@ -380,20 +381,24 @@ bool handle_packet(int fd, struct packet *p, struct clientList *client_list,
             return true;
         }
 
-        char *token;
+
         char *members[numClients];
         memset(members, 0, 20 * numClients);
-   
-        /* Get the first client name */
-        token = strtok(p->data, "\0");
-        members[0] = p->src;
         int i = 1;
-   
-        /* Get other client names */
-        while (token != NULL) {
-            members[i] = token;
-            token = strtok(NULL, "\0");
-            i += 1;
+
+        int cursor = 0;
+        char* buf = p->data;
+
+        members[0] = p->src;
+
+        while (cursor < p->len)
+        {
+            // sprintf(&members[i], "%s\n", buf);
+            printf("%s\n", buf);
+            members[i] = buf;
+            cursor += strlen(buf) + 1;
+            buf += strlen(buf) + 1;
+            i+= 1;
         }
 
         printf("Clients:\n");
@@ -428,8 +433,8 @@ bool handle_packet(int fd, struct packet *p, struct clientList *client_list,
 
         // valid chat -- forward to all clients
         else {
-            // for now, all chats public
-            int id = addChat(true, numClients, members, chat_list);
+
+            char *id = addChat(numClients, members, chat_list);
             memberAccept(id, p->src, chat_list);
 
             char id_str[12];
@@ -477,7 +482,7 @@ bool handle_packet(int fd, struct packet *p, struct clientList *client_list,
     else if (p->type == CHAT_ACCEPT){
         printf("Handling CHAT_ACCEPT from %s\n", p->src);
 
-        int chatId = atoi(p->data);
+        char *chatId = p->data;
         struct chat *ch = getChat(chatId, chat_list);
 
         if (ch == NULL){
@@ -546,7 +551,7 @@ bool handle_packet(int fd, struct packet *p, struct clientList *client_list,
     else if (p->type == CHAT_REJECT){
         printf("Handling CHAT_REJECT from %s\n", p->src);
 
-        int chatId = atoi(p->data);
+        char *chatId = p->data;
         struct chat *ch = getChat(chatId, chat_list);
 
         if (ch == NULL){
@@ -626,8 +631,6 @@ bool handle_packet(int fd, struct packet *p, struct clientList *client_list,
             removeClient(p->src, client_list);
             send_packet(fd, DELETE_ACK, "Server", p->src, 0, 0, "");
         }
-
-        send_packet(fd, DELETE_ACK, "Server", p->src, 0, 0, "");
     } 
 
     // Disconnect ---> behaves like logout
