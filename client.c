@@ -9,9 +9,9 @@
 #include <stdbool.h>
 #include <poll.h>
 
-
 #include "chatList.h"
 #include "clientList.h"
+#include "encrypt.h"
 
 #define STDIN 0
 
@@ -264,64 +264,14 @@ void logout(int sockfd)
     close(sockfd);
 }
 
-void send_packet(int sockfd, int type, char *src, char *dst, int len, int msg_id, 
+void send_packet(int fd, int type, char *src, char *dst, int len, int msg_id, 
                  char *data)
 {
-    char buffer[256];
-    int n;
-    struct header p;
-    p.type = htons(type);
-    memset(p.src, 0, 20);
-    memset(p.dst, 0, 20);
-    memcpy(p.src, src, strlen(src) + 1);
-    memcpy(p.dst, dst, strlen(dst) + 1);
-    p.len = htonl(len);
-    p.msg_id = htonl(msg_id);
-
-    // Write header
-    write(sockfd, (char *) &p, sizeof(p));
-
-    // Write data
-    if (len > 0) {
-        write(sockfd, data, strlen(data) + 1);
-    }
+    encrypted_write(fd, type, src, dst, len, msg_id, data);
 }
 
-bool read_from_server (int sockfd, struct packet *p) {
-    char header_buf[sizeof(struct header)];
-    memset(header_buf, 0, sizeof(struct header));
-    int numBytes = read(sockfd, header_buf, sizeof(struct header));
-    if (numBytes < 0) {
-        printf("Error reading from client\n");
-        return false;
-    }
-
-    else {
-        /* Data read. */
-        struct header *h = (struct header *)header_buf;
-        p->type = ntohs(h->type);
-        memcpy(p->src, h->src, strlen(h->src) + 1);
-        memcpy(p->dst, h->dst, strlen(h->dst) + 1);
-        p->len = ntohl(h->len);
-        p->msg_id = ntohl(h->msg_id);
-
-        if (p->len == 0){
-            char *data = "";
-            memcpy(p->data, data, strlen(data) + 1);
-        } else {
-            int n = 0;
-            char data[p->len];
-            n = read(sockfd, data, p->len);
-
-            if (n < 0) {
-                printf("Error reading packet data from client %s\n", p->src);
-                return false;
-            }
-            memcpy(p->data, data, p->len + 1);
-        }
-
-        return true;
-    }
+bool read_from_server (int fd, struct packet *p) {
+    return encrypted_read(fd, p);
 }
 
 bool welcome_user (int sockfd)

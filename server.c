@@ -45,11 +45,6 @@ const int DELETE_ACK = 17;
 const int MSG_ERROR = 18;
 const int CHAT_REQ = 19;
 
-// change this, obvs
-static unsigned char key[] = "01234567890123456789012345678901";
-static unsigned char iv[] = "0123456789012345";
-static unsigned char aad[] = "Some AAD data";
-
 
 struct __attribute__((__packed__)) header {
     unsigned short type;
@@ -502,7 +497,7 @@ bool handle_packet(int fd, struct packet *p, struct clientList *client_list,
         struct chat *ch = getChat(chatId, chat_list);
 
         if (ch == NULL){
-            printf("Error: requested chat does not exist\n");
+            printf("Error: requested chat %s does not exist\n", chatId);
         }
 
         // fd must match
@@ -665,37 +660,11 @@ bool handle_packet(int fd, struct packet *p, struct clientList *client_list,
 }
 
 void send_packet(int fd, int type, char *src, char *dst, int len, int msg_id, 
-                 char *data){
-    struct header p;
-    p.type = htons(type);
-    memset(p.src, 0, 20);
-    memset(p.dst, 0, 20);
-    memcpy(p.src, src, strlen(src) + 1);
-    memcpy(p.dst, dst, strlen(dst) + 1);
-    p.len = htonl(len);
-    p.msg_id = htonl(msg_id);
-
-    // data needs to be encrypted
-    if (len > 0){
-        unsigned char encrypted_data[1024];
-        unsigned char tag[16];
-
-        int n = encrypt(data, len, aad, strlen(aad), key, iv, strlen(iv), encrypted_data, tag);
-        p.len = n;
-        write(fd, (char *) &p, sizeof(p));
-
-        // Write data
-        if (len > 0) {
-            write(fd, encrypted_data, n);
-        }
-    } 
-
-    else {
-        write(fd, (char *) &p, sizeof(p));
-    }
-
-    
+                 char *data)
+{
+    encrypted_write(fd, type, src, dst, len, msg_id, data);
 }
+
 
 void sendClientList(int fd, char *dst, struct clientList *client_list) {
     int len = getClientListLen(client_list);
@@ -762,50 +731,7 @@ int make_socket (uint16_t port) {
 }
 
 bool read_from_client (int fd, struct packet *p) {
-    char header_buf[sizeof(struct header)];
-    memset(header_buf, 0, sizeof(struct header));
-     
-    int numBytes = recv(fd, header_buf, sizeof(struct header), 0);
-
-    if (numBytes < 0) {
-        printf("Error reading from client\n");
-        return false;
-    }
-
-    else {
-        /* Data read. */
-        struct header *h = (struct header *)header_buf;
-        p->type = ntohs(h->type);
-        memcpy(p->src, h->src, strlen(h->src) + 1);
-        memcpy(p->dst, h->dst, strlen(h->dst) + 1);
-        p->len = ntohl(h->len);
-        p->msg_id = ntohl(h->msg_id);
-
-        if (p->len == 0){
-            char *data = "";
-            memcpy(p->data, data, strlen(data) + 1);
-        } else {
-            int n = 0;
-            char encrypted_data[p->len];
-            n = recv(fd, encrypted_data, p->len, 0);
-
-            if (n < 0) {
-                printf("Error reading packet data from client %s\n", p->src);
-                return false;
-            } 
-
-            // decrypt data
-            char data[400];
-            char tag[16];
-            int bytes = decrypt(encrypted_data, n, aad, strlen(aad), tag, key, iv, strlen(iv), data);
-
-            memcpy(p->data, data, bytes);
-            p->len = bytes;
-            return true;
-        }
-
-        return true;
-    }
+    return encrypted_read(fd, p);
 }
 
 void geoChat(int fd, char *client, struct clientList *client_list, struct chatList *chat_list){
