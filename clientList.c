@@ -449,7 +449,7 @@ int mailboxSize(struct client *c){
 
 void emptyMailbox(struct client *c)
 {
-    cl->numMessages = 0;
+    c->numMessages = 0;
 }
 
 // FOR TESTING

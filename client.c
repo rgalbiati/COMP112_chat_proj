@@ -428,7 +428,6 @@ void send_message (int sockfd)
     char id[256];
     bzero(id, 256);
     memcpy(id, tmp, strlen(tmp) + 1);
-    printf("id before is %s\n", id);
     printf("New Message : ");
     bzero(buffer,256);
     fgets(buffer,256,stdin);
