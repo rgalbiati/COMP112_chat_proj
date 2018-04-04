@@ -11,7 +11,8 @@
 #include <stdbool.h>
 #include "chatList.h"
 #include "clientList.h"
- #include <openssl/rsa.h>
+#include "encrypt.h"
+ // #include <openssl/rsa.h>
 // #include <openssl/ssl.h>
 
 const int BUFSIZE = 512;
@@ -43,6 +44,12 @@ const int DELETE_USER = 16;
 const int DELETE_ACK = 17;
 const int MSG_ERROR = 18;
 const int CHAT_REQ = 19;
+
+// change this, obvs
+static unsigned char key[] = "01234567890123456789012345678901";
+static unsigned char iv[] = "0123456789012345";
+static unsigned char aad[] = "Some AAD data";
+
 
 struct __attribute__((__packed__)) header {
     unsigned short type;
@@ -668,13 +675,26 @@ void send_packet(int fd, int type, char *src, char *dst, int len, int msg_id,
     p.len = htonl(len);
     p.msg_id = htonl(msg_id);
 
-    // Write header
-    write(fd, (char *) &p, sizeof(p));
+    // data needs to be encrypted
+    if (len > 0){
+        unsigned char encrypted_data[1024];
+        unsigned char tag[16];
 
-    // Write data
-    if (len > 0) {
-        write(fd, data, strlen(data) + 1);
+        int n = encrypt(data, len, aad, strlen(aad), key, iv, strlen(iv), encrypted_data, tag);
+        p.len = n;
+        write(fd, (char *) &p, sizeof(p));
+
+        // Write data
+        if (len > 0) {
+            write(fd, encrypted_data, n);
+        }
+    } 
+
+    else {
+        write(fd, (char *) &p, sizeof(p));
     }
+
+    
 }
 
 void sendClientList(int fd, char *dst, struct clientList *client_list) {
@@ -766,14 +786,22 @@ bool read_from_client (int fd, struct packet *p) {
             memcpy(p->data, data, strlen(data) + 1);
         } else {
             int n = 0;
-            char data[DATA_SIZE];
-            n = recv(fd, data, DATA_SIZE, 0);
+            char encrypted_data[p->len];
+            n = recv(fd, encrypted_data, p->len, 0);
 
             if (n < 0) {
                 printf("Error reading packet data from client %s\n", p->src);
                 return false;
-            }
-            memcpy(p->data, data, DATA_SIZE + 1);
+            } 
+
+            // decrypt data
+            char data[400];
+            char tag[16];
+            int bytes = decrypt(encrypted_data, n, aad, strlen(aad), tag, key, iv, strlen(iv), data);
+
+            memcpy(p->data, data, bytes);
+            p->len = bytes;
+            return true;
         }
 
         return true;
