@@ -2,6 +2,7 @@
 
 #include <stdlib.h>
 #include <stdio.h> 
+#include <string.h>
 #include <openssl/aes.h>
 
 static const unsigned char key[] = {
@@ -12,40 +13,49 @@ static const unsigned char key[] = {
 };
 
 
-int main()
-{
-    unsigned char text[]="hello world!";
-    unsigned char enc_out[16];
-    unsigned char dec_out[16];
+int main(){
+	char *s1 = "hello";
+	char *s2 = "a much \0loooooooooooooooooonger string";
 
-    AES_KEY enc_key, dec_key;
+	printf("%d\n", strlen(s1));
+	printf("%d\n", strlen(s2));
+	return 0;
+}
 
-    AES_set_encrypt_key(key, 128, &enc_key);
-    AES_encrypt(text, enc_out, &enc_key);      
+// int main()
+// {
+//     unsigned char text[]="hello world!";
+//     unsigned char enc_out[16];
+//     unsigned char dec_out[16];
 
-    AES_set_decrypt_key(key,128,&dec_key);
-    AES_decrypt(enc_out, dec_out, &dec_key);
+//     AES_KEY enc_key, dec_key;
 
-    int i;
+//     AES_set_encrypt_key(key, 128, &enc_key);
+//     AES_encrypt(text, enc_out, &enc_key);      
 
-    printf("original:\t");
-    for(i=0;*(text+i)!=0x00;i++)
-        printf("%X ",*(text+i));
-    printf("\nencrypted:\t");
-    for(i=0;*(enc_out+i)!=0x00;i++)
-        printf("%X ",*(enc_out+i));
-    printf("\ndecrypted:\t");
-    for(i=0;*(dec_out+i)!=0x00;i++)
-        printf("%X ",*(dec_out+i));
+//     AES_set_decrypt_key(key,128,&dec_key);
+//     AES_decrypt(enc_out, dec_out, &dec_key);
 
-    printf("\n");
+//     int i;
 
-    printf("End message:\n");
-    printf("%s\n", dec_out);
+//     printf("original:\t");
+//     for(i=0;*(text+i)!=0x00;i++)
+//         printf("%X ",*(text+i));
+//     printf("\nencrypted:\t");
+//     for(i=0;*(enc_out+i)!=0x00;i++)
+//         printf("%X ",*(enc_out+i));
+//     printf("\ndecrypted:\t");
+//     for(i=0;*(dec_out+i)!=0x00;i++)
+//         printf("%X ",*(dec_out+i));
+
+//     printf("\n");
+
+//     printf("End message:\n");
+//     printf("%s\n", dec_out);
 
 
-    return 0;
-} 
+//     return 0;
+// } 
 
 
 // int main(int argc, char *argv[]){
