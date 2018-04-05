@@ -14,8 +14,6 @@
 #include "encrypt.h"
 #include <openssl/aes.h>
 #include <openssl/evp.h>
- // #include <openssl/rsa.h>
-// #include <openssl/ssl.h>
 
 const int BUFSIZE = 512;
 const int DATA_SIZE = 400;
@@ -47,7 +45,6 @@ const int DELETE_ACK = 17;
 const int MSG_ERROR = 18;
 const int CHAT_REQ = 19;
 
-
 struct __attribute__((__packed__)) header {
     unsigned short type;
     char src[20];
@@ -64,10 +61,10 @@ void sendClientList(int fd, char *dst, struct clientList *client_list);
 void sendChatList(int fd, char *dst, struct chatList *chat_list);
 int make_socket (uint16_t port);
 bool read_from_client (int fd, struct packet *p);
-void geoChat(int fd, char *client, struct clientList *client_list, struct chatList *chat_list);
+void geoChat(int fd, char *client, struct clientList *client_list, 
+             struct chatList *chat_list);
 void print_packet(struct packet *p);
 
-// AES_KEY enc_key, dec_key;
 EVP_CIPHER_CTX enc_key, dec_key;
 
 int main (int argc, char* argv[]) {
@@ -76,8 +73,6 @@ int main (int argc, char* argv[]) {
     struct sockaddr_in clientname;
     int numClients = 0, numChats = 0;
     int len = sizeof(struct sockaddr);
-
-
 
     if (argc != 3) {
         printf("./server <port> <key>.\n");
@@ -88,11 +83,7 @@ int main (int argc, char* argv[]) {
     char *key = argv[2];
 
     // initialize encryption
-    // AES_set_decrypt_key(key, 128, &dec_key);
-    // AES_set_encrypt_key(key, 128, &enc_key);
     aes_init(key, strlen(key), NULL, &enc_key, &dec_key);
-
-    
 
     /* Create the socket and set it up to accept connections. */
     sock = make_socket (port);
@@ -107,9 +98,9 @@ int main (int argc, char* argv[]) {
     FD_ZERO (&active_fd_set);
     FD_SET (sock, &active_fd_set);
 
+    // Initialize data structures
     struct clientList *client_list = newClientList();
     struct chatList *chat_list = newChatList();
-
 
     while (1) {
         /* Block until input arrives on one or more active sockets. */
@@ -135,9 +126,6 @@ int main (int argc, char* argv[]) {
                             inet_ntoa (clientname.sin_addr),
                             ntohs (clientname.sin_port));
                     FD_SET (new, &active_fd_set);
-
-
-                    // TODO SEND SERVER PUBLIC KEY TO CLIENT HERE
                 } 
                 
                 /* Data arriving on an already-connected socket. */
@@ -148,12 +136,6 @@ int main (int argc, char* argv[]) {
                         FD_CLR (i, &active_fd_set);
                     }
                     else {
-
-                        // struct sockaddr_in* addr = (struct sockaddr_in*)&clientname;
-                        // struct in_addr ipAddr = addr->sin_addr;
-
-                        // char client_ip[INET_ADDRSTRLEN];
-                        // inet_ntop(AF_INET, &ipAddr, client_ip, INET_ADDRSTRLEN);
                         struct sockaddr_in foo;
 
                         if (getpeername(i, (struct sockaddr *)&foo, &len) < 0){
@@ -177,7 +159,7 @@ int main (int argc, char* argv[]) {
 bool handle_packet(int fd, struct packet *p, struct clientList *client_list, 
                    struct chatList *chat_list, char *ip){
 
-    print_packet(p);
+    // print_packet(p);
     printClients(client_list);
     printChats(chat_list);
 
@@ -242,7 +224,6 @@ bool handle_packet(int fd, struct packet *p, struct clientList *client_list,
         }
     }
 
-    // should this have an ack??
     else if (p->type == LOGOUT){
         printf("Handling LOGOUT from %s\n", p->src);
 
@@ -259,7 +240,6 @@ bool handle_packet(int fd, struct packet *p, struct clientList *client_list,
             removeUserFromGeoChat(p->src, country_chatid, chat_list);
             removeUserFromGeoChat(p->src, city_chatid, chat_list);
         }
-
     }
 
     else if (p->type == CLIENT_LIST_REQ){
@@ -296,9 +276,6 @@ bool handle_packet(int fd, struct packet *p, struct clientList *client_list,
         else { 
             sendChatList(fd, p->src, chat_list);
         }
-
-        // sendChatList("Error")
-
     }
     
     else if (p->type == MSG){
@@ -323,7 +300,7 @@ bool handle_packet(int fd, struct packet *p, struct clientList *client_list,
 
         // chat does not exist
         else if (c == NULL){
-            printf("Error: chat %d not found\n", chatId);
+            printf("Error: chat %s not found\n", chatId);
             char error[60];
             sprintf(error, "Chat %s not logged in", chatId);
             send_packet(fd, MSG_ERROR, "Server", p->src, strlen(error) + 1, p->msg_id, error);
@@ -331,7 +308,7 @@ bool handle_packet(int fd, struct packet *p, struct clientList *client_list,
 
         // not valid chat member
         else if (!isMemberChat(p->src, c)){
-            printf("Error: %s is not a member of chat: %d\n", p->src, chatId);
+            printf("Error: %s is not a member of chat: %s\n", p->src, chatId);
             char error[60];
             sprintf(error, "Client %s is not a member of chat %s", p->src, chatId);
             send_packet(fd, MSG_ERROR, "Server", p->src, strlen(error) + 1, p->msg_id, error);
@@ -362,9 +339,10 @@ bool handle_packet(int fd, struct packet *p, struct clientList *client_list,
 
                 // store in mailbox for when user logs back in
                 else {
-                    if (mailboxSize(getClient(c->members[j], client_list)) == MAILBOX_SIZE){
-                        printf("Error: client %s's mailbox is full\n", c->members[j]);
-                        // TODO - better error handling here
+                    if (mailboxSize(getClient(c->members[j], client_list)) == 
+                        MAILBOX_SIZE){
+                        printf("Error: client %s's mailbox is full\n", 
+                                c->members[j]);
                         return true;
                     }
 
@@ -380,14 +358,12 @@ bool handle_packet(int fd, struct packet *p, struct clientList *client_list,
                     memcpy(pck.data, p->data, p->len + 1);
                     addPacketMailbox(c->members[j], pck, client_list);
                 }
-                
             }
         }
     }
     
     else if (p->type == CREATE_CHAT){
         printf("Handling CREATE_CHAT from %s\n", p->src);
-        printf("data in create Chat: %s\n", p->data);
 
         // create list of dest clients
         int len = p->len;
@@ -403,12 +379,14 @@ bool handle_packet(int fd, struct packet *p, struct clientList *client_list,
         if (numClients > 5) {
             printf("Error: Too many clients for chat\n");
             char *error = "Too many clients";
-            send_packet(fd, CHAT_FAIL, "Server", p->src, strlen(error) + 1, 0, error);
+            send_packet(fd, CHAT_FAIL, "Server", p->src, strlen(error) + 1, 
+                        0, error);
             return true;
         } else if (numClients == 1){
-            printf("Error: client must request at least one user to chat with\n");
+            printf("Error: client must request at least one user for chat\n");
             char *error = "Client must request at least one user to chat with";
-            send_packet(fd, CHAT_FAIL, "Server", p->src, strlen(error) + 1, 0, error);
+            send_packet(fd, CHAT_FAIL, "Server", p->src, 
+                        strlen(error) + 1, 0, error);
             return true;
         }
 
@@ -421,9 +399,7 @@ bool handle_packet(int fd, struct packet *p, struct clientList *client_list,
 
         members[0] = p->src;
 
-        while (cursor < p->len)
-        {
-            // sprintf(&members[i], "%s\n", buf);
+        while (cursor < p->len){
             printf("%s\n", buf);
             members[i] = buf;
             cursor += strlen(buf) + 1;
@@ -431,18 +407,19 @@ bool handle_packet(int fd, struct packet *p, struct clientList *client_list,
             i+= 1;
         }
 
-        printf("Clients:\n");
-        for (int j = 0; j < numClients; j++){
-            printf("* %s\n", members[j]);
-        }
+        // printf("Clients:\n");
+        // for (int j = 0; j < numClients; j++){
+        //     printf("* %s\n", members[j]);
+        // }
 
-        // all clients exist
+        // check all clients exist
         for (int i = 0; i < numClients; i++){
             printf("Checking for client %s\n", members[i]);
             if (!hasClient(members[i], client_list)) {
                 printf("Error: client %s does not exist\n");
                 char *error = "Client does not exist";
-                send_packet(fd, CHAT_FAIL, "Server", p->src, strlen(error) + 1, 0, error);
+                send_packet(fd, CHAT_FAIL, "Server", p->src, 
+                            strlen(error) + 1, 0, error);
                 return true;
             }
         }
@@ -451,7 +428,8 @@ bool handle_packet(int fd, struct packet *p, struct clientList *client_list,
         if (!isLoggedIn(p->src, client_list)) {
             printf("Error: client %s is not logged in\n");
             char *error = "Source not logged in";
-            send_packet(fd, CHAT_FAIL, "Server", p->src, strlen(error), 0, error);
+            send_packet(fd, CHAT_FAIL, "Server", p->src, strlen(error), 0, 
+                        error);
         }
 
         // fd must match
@@ -468,9 +446,6 @@ bool handle_packet(int fd, struct packet *p, struct clientList *client_list,
             printf("adding chat %s\n", id);
             memberAccept(id, p->src, chat_list);
 
-            // char id_str[12];
-            // sprintf(id, "%d", id);
-
             for (int i = 1; i < numClients; i++){
                 if (isLoggedIn(members[i], client_list)){
                     int clientfd = getfd(members[i], client_list);
@@ -481,11 +456,14 @@ bool handle_packet(int fd, struct packet *p, struct clientList *client_list,
                 // store in mailbox
                 else {
 
-                    if (mailboxSize(getClient(members[i], client_list)) == MAILBOX_SIZE){
-                        printf("Error: client %s's mailbox is full\n", members[i]);
+                    if (mailboxSize(getClient(members[i], client_list)) == 
+                        MAILBOX_SIZE){
+                        printf("Error: client %s's mailbox is full\n", 
+                                members[i]);
 
                         char error[60];
-                        sprintf(error, "Client %s's mailbox is full", members[i]);
+                        sprintf(error, "Client %s's mailbox is full", 
+                                members[i]);
                         send_packet(fd, CHAT_FAIL, "Server", p->src, 
                                     strlen(error) + 1, 0, error);
                         return true;
@@ -514,14 +492,15 @@ bool handle_packet(int fd, struct packet *p, struct clientList *client_list,
         printf("Handling CHAT_ACCEPT from %s\n", p->src);
 
         char *chatId = p->data;
-        printf("in chat accept, id is %s\n", chatId);
+        // printf("in chat accept, id is %s\n", chatId);
 
         struct chat *ch = getChat(chatId, chat_list);
 
         if (ch == NULL){
             printf("Error: requested chat %s does not exist\n", chatId);
             char *error = "Requested chat does not exist";
-            send_packet(fd, CHAT_FAIL, "Server", p->src, strlen(error) + 1, 0, error);
+            send_packet(fd, CHAT_FAIL, "Server", p->src, strlen(error) + 1, 0, 
+                        error);
         }
 
         // fd must match
@@ -537,7 +516,8 @@ bool handle_packet(int fd, struct packet *p, struct clientList *client_list,
         else if (!isMemberChat(p->src, ch)) {
             printf("Error: client %s is not a member of requested chat\n");
             char *error = "Client %s is not a member of requested chat";
-            send_packet(fd, CHAT_FAIL, "Server", p->src, strlen(error) + 1, 0, error);
+            send_packet(fd, CHAT_FAIL, "Server", p->src, strlen(error) + 1, 0, 
+                        error);
         }
 
         // valid chat accept
@@ -552,18 +532,22 @@ bool handle_packet(int fd, struct packet *p, struct clientList *client_list,
                     if (isLoggedIn(ch->members[j], client_list)){
                         int clientfd = getfd(ch->members[j], client_list);
                         
-                        send_packet(clientfd, CHAT_ACK, "Server", ch->members[j], 
-                                    strlen(p->data) + 1, 0, p->data);
+                        send_packet(clientfd, CHAT_ACK, "Server", 
+                                    ch->members[j], strlen(p->data) + 1, 
+                                    0, p->data);
                     }
                     
 
                     // store in mailbox
                     else {
 
-                        if (mailboxSize(getClient(ch->members[j], client_list)) == MAILBOX_SIZE){
-                            printf("Error: client %s's mailbox is full\n", ch->members[j]);
+                        if (mailboxSize(getClient(ch->members[j], client_list)) 
+                            == MAILBOX_SIZE){
+                            printf("Error: client %s's mailbox is full\n", 
+                                    ch->members[j]);
                             char error[60];
-                            sprintf(error, "Client %s's mailbox is full", ch->members[j]);
+                            sprintf(error, "Client %s's mailbox is full", 
+                                    ch->members[j]);
                             send_packet(fd, CHAT_FAIL, "Server", p->src, 
                                         strlen(error) + 1, 0, error);
                             return true;
@@ -573,7 +557,8 @@ bool handle_packet(int fd, struct packet *p, struct clientList *client_list,
                         memset(pck.src, 0, USER_LEN);
                         memcpy(pck.src, p->src, strlen(p->src) + 1);
                         memset(pck.dst, 0, USER_LEN);
-                        memcpy(pck.dst, ch->members[j], strlen(ch->members[j]) + 1);
+                        memcpy(pck.dst, ch->members[j], 
+                               strlen(ch->members[j]) + 1);
                         pck.len = p->len;
                         pck.msg_id = 0;
                         memset(pck.data, 0, 400);
@@ -594,7 +579,8 @@ bool handle_packet(int fd, struct packet *p, struct clientList *client_list,
         if (ch == NULL){
             printf("Error: requested chat does not exist\n");
             char *error = "Requested chat does not exist";
-            send_packet(fd, CHAT_FAIL, "Server", p->src, strlen(error) + 1, 0, error);
+            send_packet(fd, CHAT_FAIL, "Server", p->src, strlen(error) + 1, 
+                        0, error);
         }
 
         // fd must match
@@ -624,10 +610,13 @@ bool handle_packet(int fd, struct packet *p, struct clientList *client_list,
                 }
                 // else store in mailbox + send when user logs back in
                 else {
-                    if (mailboxSize(getClient(ch->members[j], client_list)) == MAILBOX_SIZE){
-                        printf("Error: client %s's mailbox is full\n", ch->members[j]);
+                    if (mailboxSize(getClient(ch->members[j], client_list)) == 
+                        MAILBOX_SIZE){
+                        printf("Error: client %s's mailbox is full\n", 
+                                ch->members[j]);
                         char error[60];
-                        sprintf(error, "Client %s's mailbox is full", ch->members[j]);
+                        sprintf(error, "Client %s's mailbox is full", 
+                                ch->members[j]);
                         send_packet(fd, CHAT_FAIL, "Server", p->src, 
                                     strlen(error) + 1, 0, error);
                         return true;
@@ -689,8 +678,7 @@ bool handle_packet(int fd, struct packet *p, struct clientList *client_list,
 }
 
 void send_packet(int fd, int type, char *src, char *dst, int len, int msg_id, 
-                 char *data)
-{
+                 char *data) {
     encrypted_write(&enc_key, fd, type, src, dst, len, msg_id, data);
 }
 
@@ -761,11 +749,10 @@ int make_socket (uint16_t port) {
 
 bool read_from_client (int fd, struct packet *p) {
     return encrypted_read(&dec_key, fd, p);
-    // return true;
 }
 
-void geoChat(int fd, char *client, struct clientList *client_list, struct chatList *chat_list){
-    // TODO here add to city + country chats + send chat reqs
+void geoChat(int fd, char *client, struct clientList *client_list, 
+             struct chatList *chat_list){
     char *country = getClientCountry(client, client_list);
     char *city = getClientCity(client, client_list);
 
@@ -794,5 +781,4 @@ void print_packet(struct packet *p) {
     if (p->len > 0) {
         printf("* data:\n%s\n", p->data);
     }
-
 }

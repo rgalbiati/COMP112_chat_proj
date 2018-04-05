@@ -275,7 +275,6 @@ void send_packet(int fd, int type, char *src, char *dst, int len, int msg_id,
 
 bool read_from_server (int fd, struct packet *p) {
     return encrypted_read(&dec_key, fd, p);
-    // return true;
 }
 
 bool welcome_user (int sockfd)
@@ -387,7 +386,7 @@ void send_message (int sockfd)
     fgets(buffer,256,stdin);
 
     // TODO not sure what to do with message id...
-    printf("id after is %s\n", id);
+    // printf("id after is %s\n", id);
     send_packet(sockfd, MSG, USERNAME, id, strlen(buffer) + 1, 
                             1, buffer);
 }

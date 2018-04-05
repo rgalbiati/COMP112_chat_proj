@@ -12,15 +12,6 @@ const static int VALID_STATUS = 1;
 const static int PENDING_STATUS = 0;
 const static int ID_LEN = 40;
 
-// struct chat {
-//     int id;
-//     int chatStatus;			  // -1 - unset, 0 - valid, 1 - pending 
-//     bool public;			  
-//     int numMembers;			  
-//     char members[5][20];      // up to 5 clients in a chat
-//    	int memberStatus[5];	  // -1 - unset, 0 - valid, 1 - pending 
-// };
-
 struct chatList *newChatList() {
 	struct chatList *c = malloc(sizeof(struct chatList));
 	c->numChats = 0;
@@ -29,7 +20,6 @@ struct chatList *newChatList() {
 	for (int i = 0; i < MAX_CHATS; i++) {
 		c->chats[i] = malloc(sizeof(struct chat));
 		memset(c->chats[i]->id, 0, ID_LEN);
-		// c->chats[i]->public = false;
 		c->chats[i]->numMembers = 0;
 		c->chats[i]->chatStatus = -1;
 		for (int j = 0; j < 5; j++) {
@@ -87,7 +77,6 @@ char *addChat(int numMembers, char **members, char *id, struct chatList *c) {
 		c->chats[chatIndex]->memberStatus[i] = PENDING_STATUS;
 	}
 	c->chats[chatIndex]->numMembers = numMembers;
-	// c->chats[chatIndex]->public = isPublic;
 	memset(c->chats[chatIndex]->id, 0, ID_LEN);
 
 	if (id == NULL){
@@ -112,7 +101,6 @@ bool removeChat(char *chat_id, struct chatList *c) {
 				memset(c->chats[i]->id, 0, ID_LEN);
 				memcpy(c->chats[i]->id, c->chats[numChats - 1]->id, ID_LEN);
 				c->chats[i]->chatStatus = c->chats[numChats - 1]->chatStatus;
-				// c->chats[i]->public = c->chats[numChats - 1]->public;
 				c->chats[i]->numMembers = c->chats[numChats - 1]->numMembers;
 
 				int nm = c->chats[numChats - 1]->numMembers;
@@ -146,7 +134,7 @@ int getChatListLen(char *client, struct chatList *c){
 	for (int i = 0; i < numChats; i++){
 		if (isMemberChat(client, c->chats[i])){
 			struct chat *ch = c->chats[i];
-			len += strlen(ch->id) + 2;
+			len += strlen(ch->id) + 1;
 			int numMembers = ch->numMembers;
 			for (int j = 0; j < numMembers; j++){
 				len += strlen(ch->members[j])+ 1;
@@ -222,13 +210,6 @@ void printChats(struct chatList *c) {
 		int numMembers = c->chats[i]->numMembers;
 	
 		printf("%d) id: %s, %d members, ", i, c->chats[i]->id, numMembers);
-	
-		
-		// if (c->chats[i]->public == true) {
-		// 	printf("public, ");
-		// } else {
-		// 	printf("private, ");
-		// }
 
 		if (c->chats[i]->chatStatus == VALID_STATUS) {
 			printf("status: valid");
@@ -324,28 +305,18 @@ char *addUserToGeoChat(char *client, char *location, struct chatList *c){
 	memset(test, 0, ID_LEN);
 	strcpy(test, location);
 	strcat(test, num_geo_str);
-
-	// char *prev = malloc(ID_LEN);
-
 	struct chat *ch = getChat(test, c);
-	// printf("Looking for chat %s\n", test);
-	while (ch != NULL){
-		
 
+	while (ch != NULL){
+	
 		if (numMembersChat(ch) < 5) {
 			addUserToChat(client, test, c);
 			return test;
 		}		
 
-		// memset(prev, 0, ID_LEN);
-		// memcpy(prev, test, strlen(test) + 1);
-
 		num_geo += 1;
 		memset(num_geo_str, 0, 7);
 		sprintf(num_geo_str, "_%d", num_geo);
-
-		// printf("num_geo: %d, num_geo_str: %s\n", num_geo, num_geo_str);
-		// printf("Looking for chat %s\n", test);
 
 		memset(test, 0, ID_LEN);
 		strcpy(test, location);
@@ -371,10 +342,7 @@ void removeUserFromGeoChat(char *client, char *location, struct chatList *c){
 	strcpy(test, location);
 	strcat(test, num_geo_str);
 
-	// char *prev = malloc(ID_LEN);
-
 	struct chat *ch = getChat(test, c);
-	// printf("Looking for chat %s\n", test);
 	while (ch != NULL){
 	
 		if (isMemberChat(client, ch)) {
@@ -395,100 +363,11 @@ void removeUserFromGeoChat(char *client, char *location, struct chatList *c){
 	}
 }
 
-// char *getCityChatId(char *city, struct chatList *c){
-// 	return "";
-// }
-
 
 // int main(){
 // 	printf("RUNNING CHAT TEST\n");
 
 // 	struct chatList *c = newChatList();
-// 	// printChats(c);
-
-// 	char *members[] = {"Deanna", "Claire", "Caro"};
-// 	char *members2[] = {"Caro", "Grace"};
-// 	char *members3[] = {"Cupcakes", "Grace", "Spice"};
-
-// 	// char *chat1_id = addChat(3, members, "Somerville_0", c);
-// 	// char *chat2_id = addChat(2, members2, "Somerville_1", c);
-// 	// // char *chat3_id = addChat(3, members3, c);
-// 	// printChats(c);
-
-// 	// memberAccept(chat1_id, "Deanna", c);
-// 	// memberAccept(chat1_id, "Claire", c);
-// 	// memberAccept(chat1_id, "Caro", c);
-// 	// printChats(c);
-
-// 	// addUserToChat("Sarah", chat1_id, c);
-// 	// printChats(c);
-
-// 	// addUserToChat("Emily", chat1_id, c);
-// 	// printChats(c);
-
-// 	// removeUserFromChat("Sarah", chat1_id, c);
-// 	// printChats(c);
-
-// 	// removeUserFromChat("Emily", chat1_id, c);
-// 	// printChats(c);
-
-// 	addUserToGeoChat("Deanna", "Somerville", c);
-// 	printChats(c);
-// 	addUserToGeoChat("Emily", "Somerville", c);
-// 	addUserToGeoChat("Claire", "Somerville", c);
-// 	addUserToGeoChat("Caroline", "Somerville", c);
-// 	addUserToGeoChat("Sarah", "Somerville", c);
-
-
-// 	char *geochat_id = addUserToGeoChat("Joseph", "Somerville", c);
-// 	addUserToGeoChat("Paul", "Russia", c);
-// 	addUserToGeoChat("Dmitri", "Russia", c);
-// 	addUserToGeoChat("Sammy", "Somerville", c);
-// 	printChats(c);
-
-// 	removeUserFromGeoChat("Emily", "Somerville", c);
-// 	printChats(c);
-
-// 	addUserToGeoChat("Sophie", "Somerville", c);
-// 	printChats(c);
-// 	// isMember tests
-// 	// if (!isMemberChat("Deanna", chat1_id, c)) {
-// 	// 	printf("Failed isMember1 test\n");
-// 	// 	return -1;
-
-// 	// } 
-// 	// if (isMemberChat("Deanna", chat2_id, c)){
-// 	// 	printf("Failed isMember2 test\n");
-// 	// 	return -1;
-// 	// }
-// 	// struct chat *ch = getChat(chat2_id, c);
-
-// 	// memberAccept(chat2_id, "Caro", c);
-// 	// // printChats(c);
-// 	// memberAccept(chat2_id, "Grace", c);
-// 	// // printChats(c);
-
-// 	// if (getChatStatus(ch) != VALID_STATUS){
-// 	// 	printf("FAILED get chat status\n");
-// 	// 	return -1;
-// 	// }
-
-// 	// deleteChatsWithMember("Grace", c);
-// 	// printChats(c);
-
-// 	// //remove tests
-// 	// if (!removeChat(0, c)){
-// 	// 	printf("Unable to remove chat 2\n");
-// 	// 	return -1;
-// 	// }
-	
-
-// 	// if (!removeChat(2, c)){
-// 	// 	printf("Unable to remove chat 2\n");
-// 	// 	return -1;
-// 	// }
-
-	
 // 	// printChats(c);
 
 // 	freeChatList(c);

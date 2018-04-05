@@ -1,6 +1,7 @@
 /**
-  Some Code from AES encryption/decryption demo program using OpenSSL EVP apis
+  Some code from AES encryption/decryption demo program using OpenSSL EVP apis
   https://github.com/saju/misc/blob/master/misc/openssl_aes.c
+    --> aes_encrypt, aes_decrypt, aes_init
 **/
 
 #include <openssl/aes.h>
@@ -117,15 +118,9 @@ bool encrypted_read(EVP_CIPHER_CTX *d_ctx, int fd, struct packet *p){
                 printf("Error reading packet data from client %s\n", p->src);
                 return false;
             } 
-
-
             char *data = aes_decrypt(d_ctx, encrypted_data, &p->len);
-
             memset(p->data, 0, 400);
             memcpy(p->data, data, p->len);;
-
-
-            
         }
         return true;
     }
@@ -147,17 +142,13 @@ void encrypted_write(EVP_CIPHER_CTX *e_ctx, int fd, int type, char *src, char *d
     if (len > 0){
         int new_len = len;
         char *encrypted_data = aes_encrypt(e_ctx, data, &new_len);
-
-    
         p.len = htonl(new_len);
-
         write(fd, (char *) &p, sizeof(p));
 
         // // Write data
         if (len > 0) {
             write(fd, encrypted_data, new_len);
             free(encrypted_data);
-            // free(enc_out);
         }
     } 
 
@@ -165,8 +156,6 @@ void encrypted_write(EVP_CIPHER_CTX *e_ctx, int fd, int type, char *src, char *d
         write(fd, (char *) &p, sizeof(p));
     }
 }
-
-
 
 
 /**
