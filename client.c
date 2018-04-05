@@ -93,29 +93,44 @@ void print_chats (struct packet *packet)
         return;
     }
 
-    printf("Chat ID : ");
-    printf("%s\n", buf);
-    cursor += strlen(buf) + 1;
-    buf += strlen(buf) + 1;
-
     while (cursor < packet->len) {
-        if (buf[0] == '\n') {
-            buf++;
-            cursor++;
-            if (cursor >= (packet->len - 2)) {
-                break;
-            }
-            printf("Chat ID : ");
-            i = 0;
-        }
-        else {
-            printf("%d) ", i);
-            i++;
-        }
+        printf("Chat ID : ");
         printf("%s\n", buf);
         cursor += strlen(buf) + 1;
         buf += strlen(buf) + 1;
+        while (buf[0] != '\n' && cursor < packet->len) {
+            printf("%d) ", i);
+            printf("%s\n", buf);
+            cursor += strlen(buf) + 1;
+            buf += strlen(buf) + 1;
+            i++;
+        }
+        cursor ++;
+        buf ++;
+        i = 0;
     }
+
+    // printf("Chat ID : ");
+    // printf("%s\n", buf);
+    // cursor += strlen(buf) + 1;
+    // buf += strlen(buf) + 1;
+
+    // while (cursor < packet->len) {
+    //     if (buf[0] == '\n') {
+    //         buf++;
+    //         cursor++;
+        
+    //         printf("Chat ID : ");
+    //         i = 0;
+    //     }
+    //     else {
+    //         printf("%d) ", i);
+    //         i++;
+    //     }
+    //     printf("%s\n", buf);
+    //     cursor += strlen(buf) + 1;
+    //     buf += strlen(buf) + 1;
+    // }
 }
 
 void error(const char *msg)

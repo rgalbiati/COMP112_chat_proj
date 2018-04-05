@@ -291,7 +291,6 @@ bool handle_packet(int fd, struct packet *p, struct clientList *client_list,
             sendChatList(fd, p->src, chat_list);
         }
 
-        // what should the chat list look like?
         // sendChatList("Error")
 
     }
@@ -382,7 +381,7 @@ bool handle_packet(int fd, struct packet *p, struct clientList *client_list,
     
     else if (p->type == CREATE_CHAT){
         printf("Handling CREATE_CHAT from %s\n", p->src);
-        printf("%s\n", p->data);
+        printf("data in create Chat: %s\n", p->data);
 
         // create list of dest clients
         int len = p->len;
@@ -460,16 +459,17 @@ bool handle_packet(int fd, struct packet *p, struct clientList *client_list,
         else {
 
             char *id = addChat(numClients, members, NULL, chat_list);
+            printf("adding chat %s\n", id);
             memberAccept(id, p->src, chat_list);
 
-            char id_str[12];
-            sprintf(id_str, "%d", id);
+            // char id_str[12];
+            // sprintf(id, "%d", id);
 
             for (int i = 1; i < numClients; i++){
                 if (isLoggedIn(members[i], client_list)){
                     int clientfd = getfd(members[i], client_list);
                     send_packet(clientfd, CHAT_REQ, p->src, members[i], 
-                                strlen(id_str) + 1, 0, id_str);
+                                strlen(id) + 1, 0, id);
                 }
                     
                 // store in mailbox
@@ -494,10 +494,10 @@ bool handle_packet(int fd, struct packet *p, struct clientList *client_list,
                     memset(pck.dst, 0, USER_LEN);
                     memcpy(pck.dst, members[i], strlen(members[i]) + 1);
 
-                    pck.len = strlen(id_str) + 1;
+                    pck.len = strlen(id) + 1;
                     pck.msg_id = 0;
                     memset(pck.data, 0, 400);
-                    memcpy(pck.data, id_str, strlen(id_str) + 1);
+                    memcpy(pck.data, id, strlen(id) + 1);
                     addPacketMailbox(members[i], pck, client_list);
                 }
             }
@@ -508,10 +508,14 @@ bool handle_packet(int fd, struct packet *p, struct clientList *client_list,
         printf("Handling CHAT_ACCEPT from %s\n", p->src);
 
         char *chatId = p->data;
+        printf("in chat accept, id is %s\n", chatId);
+
         struct chat *ch = getChat(chatId, chat_list);
 
         if (ch == NULL){
             printf("Error: requested chat %s does not exist\n", chatId);
+            char *error = "Requested chat does not exist";
+            send_packet(fd, CHAT_FAIL, "Server", p->src, strlen(error) + 1, 0, error);
         }
 
         // fd must match
@@ -526,6 +530,8 @@ bool handle_packet(int fd, struct packet *p, struct clientList *client_list,
 
         else if (!isMemberChat(p->src, ch)) {
             printf("Error: client %s is not a member of requested chat\n");
+            char *error = "Client %s is not a member of requested chat";
+            send_packet(fd, CHAT_FAIL, "Server", p->src, strlen(error) + 1, 0, error);
         }
 
         // valid chat accept
@@ -581,6 +587,8 @@ bool handle_packet(int fd, struct packet *p, struct clientList *client_list,
 
         if (ch == NULL){
             printf("Error: requested chat does not exist\n");
+            char *error = "Requested chat does not exist";
+            send_packet(fd, CHAT_FAIL, "Server", p->src, strlen(error) + 1, 0, error);
         }
 
         // fd must match
