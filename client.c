@@ -267,7 +267,10 @@ void logout(int sockfd)
 void send_packet(int fd, int type, char *src, char *dst, int len, int msg_id, 
                  char *data)
 {
+    printf("beginning of send packet\n");
     encrypted_write(fd, type, src, dst, len, msg_id, data);
+    printf("after send packet\n");
+
 }
 
 bool read_from_server (int fd, struct packet *p) {
@@ -469,7 +472,7 @@ int main(int argc, char *argv[])
             if(FD_ISSET(sockfd, &readfds) != 0)
             {
                 read_from_server(sockfd, &p);
-                if (p.type == 19) {
+                if (p.type == CHAT_REQ) {
                     respond_to_request(sockfd, &p);
                 }
                 else if (p.type == MSG) {

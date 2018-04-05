@@ -39,6 +39,7 @@ bool encrypted_read(int fd, struct packet *p){
 
     else {
 
+
         /* Data read. */
         struct header *h = (struct header *)header_buf;
         p->type = ntohs(h->type);
@@ -55,30 +56,48 @@ bool encrypted_read(int fd, struct packet *p){
             char *encrypted_data = malloc(p->len);
             n = recv(fd, encrypted_data, p->len, 0);
 
+            printf("in read len is %d and data is %s\n", p->len, p->data);
+
             if (n < 0) {
                 printf("Error reading packet data from client %s\n", p->src);
                 return false;
             } 
 
+            unsigned char dec_out[16];
+            AES_KEY dec_key;
+
+            AES_set_decrypt_key(key,128,&dec_key);
+            AES_decrypt(encrypted_data, dec_out, &dec_key);
+            
+            printf("len %d\n", p->len);
+
+            p->len = strlen(dec_out);
+
+            //possible this needs to be a for loop....
+            memcpy(p->data, dec_out, p->len);
+
+            printf("then in read len is %d and data is %s\n", p->len, p->data);
+
+
             // decrypt data
-            char *data = malloc(400);
-            char *tag = malloc(16);
-            memset(tag, 0, 16);
-            memset(data, 0, 400);
-            int bytes = decrypt(encrypted_data, n, aad, strlen(aad), tag, key, iv, strlen(iv), data);
+            // char *data = malloc(400);
+            // char *tag = malloc(16);
+            // memset(tag, 0, 16);
+            // memset(data, 0, 400);
+            // int bytes = decrypt(encrypted_data, n, aad, strlen(aad), tag, key, iv, strlen(iv), data);
 
-            if (bytes < 0) {
-                printf("Error: Failure to authenticate\n");
-                // return false;
-            }
-            printf("bytes: %d\n", bytes);
-            printf("decrypted: %s\n", data);
+            // if (bytes < 0) {
+            //     printf("Error: Failure to authenticate\n");
+            //     // return false;
+            // }
+            // printf("bytes: %d\n", bytes);
+            // printf("decrypted: %s\n", data);
 
-            memcpy(p->data, data, bytes);
-            p->len = bytes;
-            free(encrypted_data);
-            free(tag);
-            free(data);
+            // memcpy(p->data, data, bytes);
+            // p->len = bytes;
+            // free(encrypted_data);
+            // free(tag);
+            // free(data);
         }
         return true;
     }
@@ -87,6 +106,7 @@ bool encrypted_read(int fd, struct packet *p){
 void encrypted_write(int fd, int type, char *src, char *dst, int len, int msg_id, 
                  char *data)
 {
+    printf(" in Encrypt write len is %d and data is %s\n", len, data);
     struct header p;
     p.type = htons(type);
     memset(p.src, 0, 20);
@@ -104,8 +124,8 @@ void encrypted_write(int fd, int type, char *src, char *dst, int len, int msg_id
         memset(tag, 0, 16);
 
         printf("%s\n", data);
-        printf("%s\n", aad);
-        printf("%s\n", iv);
+        // printf("%s\n", aad);
+        // printf("%s\n", iv);
         // printf("%s\n", data);
         // printf("%s\n", data);
 
@@ -125,6 +145,8 @@ void encrypted_write(int fd, int type, char *src, char *dst, int len, int msg_id
         }
        
         p.len = enc_len;
+
+        printf("in Encrypt write cry_len is %d and cry_data is %s\n", enc_len, enc_out);
 
         write(fd, (char *) &p, sizeof(p));
 
