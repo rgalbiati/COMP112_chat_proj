@@ -15,9 +15,9 @@
 #include "encrypt.h"
 
 
-static unsigned char key[] = "01234567890123456789012345678901";
-static unsigned char iv[] = "0123456789012345";
-static unsigned char aad[] = "Some AAD data";
+// static unsigned char key[] = "01234567890123456789012345678901";
+// static unsigned char iv[] = "0123456789012345";
+// static unsigned char aad[] = "Some AAD data";
 
 struct __attribute__((__packed__)) header {
     unsigned short type;
@@ -28,7 +28,7 @@ struct __attribute__((__packed__)) header {
 };
 
 
-bool encrypted_read(int fd, struct packet *p){
+bool encrypted_read(AES_KEY dec_key, int fd, struct packet *p){
 	char header_buf[sizeof(struct header)];
     memset(header_buf, 0, sizeof(struct header));
     int numBytes = read(fd, header_buf, sizeof(struct header));
@@ -53,60 +53,48 @@ bool encrypted_read(int fd, struct packet *p){
             memcpy(p->data, data, strlen(data) + 1);
         } else {
             int n = 0;
-            char *encrypted_data = malloc(p->len);
+            char encrypted_data[p->len];
             n = recv(fd, encrypted_data, p->len, 0);
 
-            printf("in read len is %d and data is %s\n", p->len, p->data);
+            // printf("in read len is %d and data is %s\n", p->len, p->data);
 
             if (n < 0) {
                 printf("Error reading packet data from client %s\n", p->src);
                 return false;
             } 
 
-            unsigned char dec_out[16];
-            AES_KEY dec_key;
-
-            AES_set_decrypt_key(key,128,&dec_key);
-            AES_decrypt(encrypted_data, dec_out, &dec_key);
+            unsigned char dec_out[400];
             
-            printf("len %d\n", p->len);
+            // AES dec_key;
+            // AES_set_decrypt_key(key, 128, &dec_key);
+            AES_decrypt(encrypted_data, dec_out, &dec_key);
 
-            p->len = strlen(dec_out);
+            
+            
+            // printf("len %d\n", p->len);
+            int dec_len = 0;
+            for(int i=0;*(dec_out+i)!=0x00;i++) {
+                dec_len += 1;
+            }
 
-            //possible this needs to be a for loop....
+            printf("Decrypted %d bytes of data: %s\n", dec_len, dec_out);
+
+            p->len = dec_len;
+
+            memset(p->data, 0, 400);
             memcpy(p->data, dec_out, p->len);
-
-            printf("then in read len is %d and data is %s\n", p->len, p->data);
-
-
-            // decrypt data
-            // char *data = malloc(400);
-            // char *tag = malloc(16);
-            // memset(tag, 0, 16);
-            // memset(data, 0, 400);
-            // int bytes = decrypt(encrypted_data, n, aad, strlen(aad), tag, key, iv, strlen(iv), data);
-
-            // if (bytes < 0) {
-            //     printf("Error: Failure to authenticate\n");
-            //     // return false;
-            // }
-            // printf("bytes: %d\n", bytes);
-            // printf("decrypted: %s\n", data);
-
-            // memcpy(p->data, data, bytes);
-            // p->len = bytes;
             // free(encrypted_data);
-            // free(tag);
-            // free(data);
+
+            
         }
         return true;
     }
 }
 
-void encrypted_write(int fd, int type, char *src, char *dst, int len, int msg_id, 
+void encrypted_write(AES_KEY enc_key, int fd, int type, char *src, char *dst, int len, int msg_id, 
                  char *data)
 {
-    printf(" in Encrypt write len is %d and data is %s\n", len, data);
+    // printf(" in Encrypt write len is %d and data is %s\n", len, data);
     struct header p;
     p.type = htons(type);
     memset(p.src, 0, 20);
@@ -118,22 +106,24 @@ void encrypted_write(int fd, int type, char *src, char *dst, int len, int msg_id
 
     // data needs to be encrypted
     if (len > 0){
-        unsigned char *encrypted_data = malloc(500);
-        unsigned char *tag = malloc(16);
-        memset(encrypted_data, 0, 500);
-        memset(tag, 0, 16);
+        // unsigned char *encrypted_data = malloc(500);
+        // unsigned char *tag = malloc(16);
+        // memset(encrypted_data, 0, 500);
+        // memset(tag, 0, 16);
 
-        printf("%s\n", data);
+        // printf("%s\n", data);
         // printf("%s\n", aad);
         // printf("%s\n", iv);
         // printf("%s\n", data);
         // printf("%s\n", data);
 
-        unsigned char enc_out[600];
-    	AES_KEY enc_key;
-
-    	AES_set_encrypt_key(key, 128, &enc_key);
-    	AES_encrypt(data, enc_out, &enc_key);      
+        unsigned char *enc_out = malloc(600);
+        memset(enc_out, 0, 600);
+    	
+     //    AES_KEY enc_key;
+    	// AES_set_encrypt_key(key, 128, &enc_key);
+    	
+        AES_encrypt(data, enc_out, &enc_key);      
 
     	// AES_set_decrypt_key(key,128,&dec_key);
     	// AES_decrypt(enc_out, dec_out, &dec_key);
@@ -144,15 +134,17 @@ void encrypted_write(int fd, int type, char *src, char *dst, int len, int msg_id
         	enc_len += 1;
         }
        
-        p.len = enc_len;
 
-        printf("in Encrypt write cry_len is %d and cry_data is %s\n", enc_len, enc_out);
+        // printf("in Encrypt write cry_len is %d and cry_data is %s\n", enc_len, enc_out);
+
+        p.len = htonl(enc_len);
 
         write(fd, (char *) &p, sizeof(p));
 
         // Write data
         if (len > 0) {
             write(fd, enc_out, enc_len);
+            free(enc_out);
         }
     } 
 

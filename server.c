@@ -12,6 +12,7 @@
 #include "chatList.h"
 #include "clientList.h"
 #include "encrypt.h"
+#include <openssl/aes.h>
  // #include <openssl/rsa.h>
 // #include <openssl/ssl.h>
 
@@ -45,6 +46,8 @@ const int DELETE_ACK = 17;
 const int MSG_ERROR = 18;
 const int CHAT_REQ = 19;
 
+static unsigned char key[] = "01234567890123456789012345678901";
+
 
 struct __attribute__((__packed__)) header {
     unsigned short type;
@@ -65,6 +68,7 @@ bool read_from_client (int fd, struct packet *p);
 void geoChat(int fd, char *client, struct clientList *client_list, struct chatList *chat_list);
 void print_packet(struct packet *p);
 
+AES_KEY enc_key, dec_key;
 
 int main (int argc, char* argv[]) {
     int sock, i, port, size;
@@ -72,6 +76,9 @@ int main (int argc, char* argv[]) {
     struct sockaddr_in clientname;
     int numClients = 0, numChats = 0;
     int len = sizeof(struct sockaddr);
+
+    AES_set_decrypt_key(key, 128, &dec_key);
+    AES_set_encrypt_key(key, 128, &enc_key);
 
 
     if (argc != 2) {
@@ -662,7 +669,7 @@ bool handle_packet(int fd, struct packet *p, struct clientList *client_list,
 void send_packet(int fd, int type, char *src, char *dst, int len, int msg_id, 
                  char *data)
 {
-    encrypted_write(fd, type, src, dst, len, msg_id, data);
+    encrypted_write(enc_key, fd, type, src, dst, len, msg_id, data);
 }
 
 
@@ -731,7 +738,7 @@ int make_socket (uint16_t port) {
 }
 
 bool read_from_client (int fd, struct packet *p) {
-    return encrypted_read(fd, p);
+    return encrypted_read(dec_key, fd, p);
 }
 
 void geoChat(int fd, char *client, struct clientList *client_list, struct chatList *chat_list){
