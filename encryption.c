@@ -14,6 +14,8 @@
 #include "clientList.h"
 #include "encrypt.h"
 
+static const int CLIENT_LIST = 8;      
+static const int CHAT_LIST = 9;  
 
 // static unsigned char key[] = "01234567890123456789012345678901";
 // static unsigned char iv[] = "0123456789012345";
@@ -51,7 +53,23 @@ bool encrypted_read(AES_KEY dec_key, int fd, struct packet *p){
         if (p->len == 0){
             char *data = "";
             memcpy(p->data, data, strlen(data) + 1);
-        } else {
+        } 
+
+        // not encrypted
+        else if (p->type == CLIENT_LIST || p->type == CHAT_LIST){
+            int n = 0;
+            char data[400];
+            n = recv(fd, data, 400, 0);
+
+            if (n < 0) {
+                printf("Error reading packet data from client %s\n", p->src);
+                return false;
+            }
+            memcpy(p->data, data, n);
+        } 
+
+        // encrypted
+        else {
             int n = 0;
             char encrypted_data[p->len];
             n = recv(fd, encrypted_data, p->len, 0);
@@ -63,7 +81,10 @@ bool encrypted_read(AES_KEY dec_key, int fd, struct packet *p){
                 return false;
             } 
 
-            unsigned char dec_out[400];
+            // unsigned char dec_out[400];
+
+            unsigned char *dec_out = malloc(600);
+            memset(dec_out, 0, 600);
             
             // AES dec_key;
             // AES_set_decrypt_key(key, 128, &dec_key);
@@ -94,7 +115,6 @@ bool encrypted_read(AES_KEY dec_key, int fd, struct packet *p){
 void encrypted_write(AES_KEY enc_key, int fd, int type, char *src, char *dst, int len, int msg_id, 
                  char *data)
 {
-    // printf(" in Encrypt write len is %d and data is %s\n", len, data);
     struct header p;
     p.type = htons(type);
     memset(p.src, 0, 20);
@@ -106,37 +126,16 @@ void encrypted_write(AES_KEY enc_key, int fd, int type, char *src, char *dst, in
 
     // data needs to be encrypted
     if (len > 0){
-        // unsigned char *encrypted_data = malloc(500);
-        // unsigned char *tag = malloc(16);
-        // memset(encrypted_data, 0, 500);
-        // memset(tag, 0, 16);
-
-        // printf("%s\n", data);
-        // printf("%s\n", aad);
-        // printf("%s\n", iv);
-        // printf("%s\n", data);
-        // printf("%s\n", data);
-
         unsigned char *enc_out = malloc(600);
         memset(enc_out, 0, 600);
     	
-     //    AES_KEY enc_key;
-    	// AES_set_encrypt_key(key, 128, &enc_key);
-    	
         AES_encrypt(data, enc_out, &enc_key);      
 
-    	// AES_set_decrypt_key(key,128,&dec_key);
-    	// AES_decrypt(enc_out, dec_out, &dec_key);
-
-        // int n = encrypt(data, strlen(data), aad, strlen(aad), key, iv, strlen(iv), encrypted_data, tag);
         int enc_len = 0;
         for(int i=0; *(enc_out+i)!=0x00; i++){
         	enc_len += 1;
         }
-       
-
-        // printf("in Encrypt write cry_len is %d and cry_data is %s\n", enc_len, enc_out);
-
+    
         p.len = htonl(enc_len);
 
         write(fd, (char *) &p, sizeof(p));
@@ -153,130 +152,3 @@ void encrypted_write(AES_KEY enc_key, int fd, int type, char *src, char *dst, in
     }
 }
 
-void handleErrors(void)
-{
-    unsigned long errCode;
-
-    printf("An error occurred\n");
-    while(errCode = ERR_get_error())
-    {
-        char *err = ERR_error_string(errCode, NULL);
-        printf("%s\n", err);
-    }
-    abort();
-}
-
-int encrypt(unsigned char *plaintext, int plaintext_len, unsigned char *aad,
-	int aad_len, unsigned char *key, unsigned char *iv, int iv_len,
-	unsigned char *ciphertext, unsigned char *tag)
-{
-	EVP_CIPHER_CTX *ctx;
-
-	int len;
-
-	int ciphertext_len;
-
-
-	/* Create and initialise the context */
-	if(!(ctx = EVP_CIPHER_CTX_new())) handleErrors();
-
-	/* Initialise the encryption operation. */
-	if(1 != EVP_EncryptInit_ex(ctx, EVP_aes_256_gcm(), NULL, NULL, NULL))
-		handleErrors();
-
-	/* Set IV length if default 12 bytes (96 bits) is not appropriate */
-	if(1 != EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_SET_IVLEN, iv_len, NULL))
-		handleErrors();
-
-	/* Initialise key and IV */
-	if(1 != EVP_EncryptInit_ex(ctx, NULL, NULL, key, iv)) handleErrors();
-
-	/* Provide any AAD data. This can be called zero or more times as
-	 * required
-	 */
-	if(1 != EVP_EncryptUpdate(ctx, NULL, &len, aad, aad_len))
-		handleErrors();
-
-	/* Provide the message to be encrypted, and obtain the encrypted output.
-	 * EVP_EncryptUpdate can be called multiple times if necessary
-	 */
-	if(1 != EVP_EncryptUpdate(ctx, ciphertext, &len, plaintext, plaintext_len))
-		handleErrors();
-	ciphertext_len = len;
-
-	/* Finalise the encryption. Normally ciphertext bytes may be written at
-	 * this stage, but this does not occur in GCM mode
-	 */
-	if(1 != EVP_EncryptFinal_ex(ctx, ciphertext + len, &len)) handleErrors();
-	ciphertext_len += len;
-
-	/* Get the tag */
-	if(1 != EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_GET_TAG, 16, tag))
-		handleErrors();
-
-	/* Clean up */
-	EVP_CIPHER_CTX_free(ctx);
-
-	return ciphertext_len;
-}
-
-int decrypt(unsigned char *ciphertext, int ciphertext_len, unsigned char *aad,
-	int aad_len, unsigned char *tag, unsigned char *key, unsigned char *iv,
-	int iv_len, unsigned char *plaintext)
-{
-	EVP_CIPHER_CTX *ctx;
-	int len;
-	int plaintext_len;
-	int ret;
-
-	/* Create and initialise the context */
-	if(!(ctx = EVP_CIPHER_CTX_new())) handleErrors();
-
-	/* Initialise the decryption operation. */
-	if(!EVP_DecryptInit_ex(ctx, EVP_aes_256_gcm(), NULL, NULL, NULL))
-		handleErrors();
-
-	/* Set IV length. Not necessary if this is 12 bytes (96 bits) */
-	if(!EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_SET_IVLEN, iv_len, NULL))
-		handleErrors();
-
-	/* Initialise key and IV */
-	if(!EVP_DecryptInit_ex(ctx, NULL, NULL, key, iv)) handleErrors();
-
-	/* Provide any AAD data. This can be called zero or more times as
-	 * required
-	 */
-	if(!EVP_DecryptUpdate(ctx, NULL, &len, aad, aad_len))
-		handleErrors();
-
-	/* Provide the message to be decrypted, and obtain the plaintext output.
-	 * EVP_DecryptUpdate can be called multiple times if necessary
-	 */
-	if(!EVP_DecryptUpdate(ctx, plaintext, &len, ciphertext, ciphertext_len))
-		handleErrors();
-	plaintext_len = len;
-
-	/* Set expected tag value. Works in OpenSSL 1.0.1d and later */
-	if(!EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_SET_TAG, 16, tag))
-		handleErrors();
-
-	/* Finalise the decryption. A positive return value indicates success,
-	 * anything else is a failure - the plaintext is not trustworthy.
-	 */
-	ret = EVP_DecryptFinal_ex(ctx, plaintext + len, &len);
-
-	/* Clean up */
-	EVP_CIPHER_CTX_free(ctx);
-
-	if(ret > 0)
-	{
-		/* Success */
-		plaintext_len += len;
-		return plaintext_len;
-	}
-	else
-	{
-		/* Verify failed */
-		return -1;
-	}
-}
