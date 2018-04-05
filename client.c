@@ -386,7 +386,7 @@ void send_message (int sockfd)
     fgets(buffer,256,stdin);
 
     // TODO not sure what to do with message id...
-    printf("id after is %s\n", id);
+    // printf("id after is %s\n", id);
     send_packet(sockfd, MSG, USERNAME, id, strlen(buffer) + 1, 
                             1, buffer);
 }

@@ -300,7 +300,7 @@ bool handle_packet(int fd, struct packet *p, struct clientList *client_list,
 
         // chat does not exist
         else if (c == NULL){
-            printf("Error: chat %d not found\n", chatId);
+            printf("Error: chat %s not found\n", chatId);
             char error[60];
             sprintf(error, "Chat %s not logged in", chatId);
             send_packet(fd, MSG_ERROR, "Server", p->src, strlen(error) + 1, p->msg_id, error);
@@ -308,7 +308,7 @@ bool handle_packet(int fd, struct packet *p, struct clientList *client_list,
 
         // not valid chat member
         else if (!isMemberChat(p->src, c)){
-            printf("Error: %s is not a member of chat: %d\n", p->src, chatId);
+            printf("Error: %s is not a member of chat: %s\n", p->src, chatId);
             char error[60];
             sprintf(error, "Client %s is not a member of chat %s", p->src, chatId);
             send_packet(fd, MSG_ERROR, "Server", p->src, strlen(error) + 1, p->msg_id, error);
