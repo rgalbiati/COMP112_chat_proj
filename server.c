@@ -208,6 +208,11 @@ bool handle_packet(int fd, struct packet *p, struct clientList *client_list,
             send_packet(fd, LOGIN_FAIL, "Server", p->src, 0, 0, "");
         } 
 
+        else if (isLoggedIn(p->src, client_list)){
+            printf("Error: client is already logged in\n");
+            send_packet(fd, LOGIN_FAIL, "Server", p->src, 0, 0, "");
+        }
+
         else if (!logInClient(p->src, p->data, ip, client_list)) {
             printf("Error: invalid login\n");
             send_packet(fd, LOGIN_FAIL, "Server", p->src, 0, 0, "");
@@ -293,7 +298,8 @@ bool handle_packet(int fd, struct packet *p, struct clientList *client_list,
     
     else if (p->type == MSG){
         char *chatId = p->dst;
-        printf("Handling MSG from %s to chat %s\n", p->src, p->dst);
+        printf("Handling MSG from %s to chat %s: %s\n", p->src, p->dst, p->data);
+
         struct chat *c = getChat(chatId, chat_list);
 
         // source must be logged in
@@ -376,6 +382,7 @@ bool handle_packet(int fd, struct packet *p, struct clientList *client_list,
     
     else if (p->type == CREATE_CHAT){
         printf("Handling CREATE_CHAT from %s\n", p->src);
+        printf("%s\n", p->data);
 
         // create list of dest clients
         int len = p->len;

@@ -16,7 +16,7 @@
 
 static const int CLIENT_LIST = 8;      
 static const int CHAT_LIST = 9;  
-
+static const int CREATE_CHAT = 11; 
 // static unsigned char key[] = "01234567890123456789012345678901";
 // static unsigned char iv[] = "0123456789012345";
 // static unsigned char aad[] = "Some AAD data";
@@ -40,8 +40,6 @@ bool encrypted_read(AES_KEY dec_key, int fd, struct packet *p){
     }
 
     else {
-
-
         /* Data read. */
         struct header *h = (struct header *)header_buf;
         p->type = ntohs(h->type);
@@ -56,7 +54,7 @@ bool encrypted_read(AES_KEY dec_key, int fd, struct packet *p){
         } 
 
         // not encrypted
-        else if (p->type == CLIENT_LIST || p->type == CHAT_LIST){
+        else if (p->type == CLIENT_LIST || p->type == CHAT_LIST || p->type == CREATE_CHAT){
             int n = 0;
             char data[400];
             n = recv(fd, data, 400, 0);
@@ -89,8 +87,6 @@ bool encrypted_read(AES_KEY dec_key, int fd, struct packet *p){
             // AES dec_key;
             // AES_set_decrypt_key(key, 128, &dec_key);
             AES_decrypt(encrypted_data, dec_out, &dec_key);
-
-            
             
             // printf("len %d\n", p->len);
             int dec_len = 0;
@@ -104,7 +100,7 @@ bool encrypted_read(AES_KEY dec_key, int fd, struct packet *p){
 
             memset(p->data, 0, 400);
             memcpy(p->data, dec_out, p->len);
-            // free(encrypted_data);
+            free(dec_out);
 
             
         }

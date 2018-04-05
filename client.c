@@ -320,7 +320,7 @@ void send_chat_req(int sockfd)
     int c;
     
     while (!valid) {
-        printf("How many users will you include in your chat?\n");
+        printf("How many other users will you include in your chat?\n");
         int result = scanf("%d", &num_clients);
 
         if (result == EOF) {
@@ -462,8 +462,10 @@ int main(int argc, char *argv[])
 
     if (welcome_user(sockfd)) {
         printf("Welcome to the chat server. What would you like to do?\n");
+        print_usage();
 
         while(!done){
+
             FD_ZERO(&readfds);
             FD_ZERO(&readfds);
 
