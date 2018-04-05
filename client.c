@@ -8,6 +8,7 @@
 #include <netdb.h> 
 #include <stdbool.h>
 #include <poll.h>
+#include <openssl/evp.h>
 
 #include "chatList.h"
 #include "clientList.h"
@@ -44,8 +45,6 @@ const int DELETE_ACK = 17;
 const int MSG_ERROR = 18;       
 const int CHAT_REQ = 19;        
 
-static unsigned char key[] = "01234567890123456789012345678901";
-
 char USERNAME[USER_LEN];
 
 struct __attribute__((__packed__)) header {
@@ -66,7 +65,8 @@ bool welcome_user (int sockfd);
 bool try_again(bool (f) (int), int sockfd, char* error);
 void print_usage ();
 
-AES_KEY enc_key, dec_key;
+// AES_KEY enc_key, dec_key;
+EVP_CIPHER_CTX enc_key, dec_key;
 
 void print_clients (struct packet * packet)
 {
@@ -285,11 +285,12 @@ void logout(int sockfd)
 void send_packet(int fd, int type, char *src, char *dst, int len, int msg_id, 
                  char *data)
 {
-    encrypted_write(enc_key, fd, type, src, dst, len, msg_id, data);
+    encrypted_write(&enc_key, fd, type, src, dst, len, msg_id, data);
 }
 
 bool read_from_server (int fd, struct packet *p) {
-    return encrypted_read(dec_key, fd, p);
+    return encrypted_read(&dec_key, fd, p);
+    // return true;
 }
 
 bool welcome_user (int sockfd)
@@ -449,15 +450,19 @@ int main(int argc, char *argv[])
     fd_set readfds;
     struct packet p;
 
-    AES_set_decrypt_key(key, 128, &dec_key);
-    AES_set_encrypt_key(key, 128, &enc_key);
+    // AES_set_decrypt_key(key, 128, &dec_key);
+    // AES_set_encrypt_key(key, 128, &enc_key);
 
     char buffer[256];
-    if (argc < 3) {
-       fprintf(stderr,"Multi-user Chat\n\nusage : %s hostname port\n\n", argv[0]);
+    if (argc < 4) {
+       fprintf(stderr,"Multi-user Chat\n\nusage : %s hostname port key\n\n", argv[0]);
        exit(0);
     }
     portno = atoi(argv[2]);
+    char *key = argv[3];
+
+    aes_init(key, strlen(key), NULL, &enc_key, &dec_key);
+
     sockfd = socket(AF_INET, SOCK_STREAM, 0);
     if (sockfd < 0) 
         error("ERROR opening socket");

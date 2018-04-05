@@ -2,6 +2,7 @@
 #define ENCRYPT_H
 
 #include <openssl/aes.h>
+#include <openssl/evp.h>
 
 // struct __attribute__((__packed__)) packet {
 //     unsigned short type;
@@ -20,8 +21,10 @@
 //     unsigned int msg_id;
 // };
 
-bool encrypted_read(AES_KEY dec_key, int fd, struct packet *p);
-void encrypted_write(AES_KEY enc_key, int fd, int type, char *src, char *dst, int len, int msg_id, 
+int aes_init(unsigned char *key_data, int key_data_len, unsigned char *salt, EVP_CIPHER_CTX *e_ctx, 
+             EVP_CIPHER_CTX *d_ctx);
+bool encrypted_read(EVP_CIPHER_CTX *d_ctx, int fd, struct packet *p);
+void encrypted_write(EVP_CIPHER_CTX *e_ctx, int fd, int type, char *src, char *dst, int len, int msg_id, 
                  char *data);
 int encrypt(unsigned char *plaintext, int plaintext_len, unsigned char *aad,
 	int aad_len, unsigned char *key, unsigned char *iv, int iv_len,

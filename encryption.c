@@ -1,6 +1,7 @@
-// encrypt and decrypt functions from the OpenSSL Wiki & StackOverflow:
-// * https://wiki.openssl.org/index.php/EVP_Authenticated_Encryption_and_Decryption  
-// * https://stackoverflow.com/questions/9889492/how-to-do-encryption-using-aes-in-openssl
+/**
+  Some Code from AES encryption/decryption demo program using OpenSSL EVP apis
+  https://github.com/saju/misc/blob/master/misc/openssl_aes.c
+**/
 
 #include <openssl/aes.h>
 #include <openssl/evp.h>
@@ -17,9 +18,6 @@
 static const int CLIENT_LIST = 8;      
 static const int CHAT_LIST = 9;  
 static const int CREATE_CHAT = 11; 
-// static unsigned char key[] = "01234567890123456789012345678901";
-// static unsigned char iv[] = "0123456789012345";
-// static unsigned char aad[] = "Some AAD data";
 
 struct __attribute__((__packed__)) header {
     unsigned short type;
@@ -29,8 +27,51 @@ struct __attribute__((__packed__)) header {
     unsigned int msg_id;
 };
 
+/*
+ * Encrypt *len bytes of data
+ * All data going in & out is considered binary (unsigned char[])
+ */
+unsigned char *aes_encrypt(EVP_CIPHER_CTX *e, unsigned char *plaintext, int *len)
+{
+  /* max ciphertext len for a n bytes of plaintext is n + AES_BLOCK_SIZE -1 bytes */
+  int c_len = *len + AES_BLOCK_SIZE, f_len = 0;
+  unsigned char *ciphertext = malloc(c_len);
+  memset(ciphertext, 0, c_len);
 
-bool encrypted_read(AES_KEY dec_key, int fd, struct packet *p){
+  /* allows reusing of 'e' for multiple encryption cycles */
+  EVP_EncryptInit_ex(e, NULL, NULL, NULL, NULL);
+
+  /* update ciphertext, c_len is filled with the length of ciphertext generated,
+    *len is the size of plaintext in bytes */
+  EVP_EncryptUpdate(e, ciphertext, &c_len, plaintext, *len);
+
+  /* update ciphertext with the final remaining bytes */
+  EVP_EncryptFinal_ex(e, ciphertext+c_len, &f_len);
+
+  *len = c_len + f_len;
+  return ciphertext;
+}
+
+/*
+ * Decrypt *len bytes of ciphertext
+ */
+unsigned char *aes_decrypt(EVP_CIPHER_CTX *e, unsigned char *ciphertext, int *len)
+{
+  /* plaintext will always be equal to or lesser than length of ciphertext*/
+  int p_len = *len, f_len = 0;
+  unsigned char *plaintext = malloc(p_len);
+  memset(plaintext, 0, p_len);
+  
+  EVP_DecryptInit_ex(e, NULL, NULL, NULL, NULL);
+  EVP_DecryptUpdate(e, plaintext, &p_len, ciphertext, *len);
+  EVP_DecryptFinal_ex(e, plaintext+p_len, &f_len);
+
+  *len = p_len + f_len;
+  return plaintext;
+}
+
+
+bool encrypted_read(EVP_CIPHER_CTX *d_ctx, int fd, struct packet *p){
 	char header_buf[sizeof(struct header)];
     memset(header_buf, 0, sizeof(struct header));
     int numBytes = read(fd, header_buf, sizeof(struct header));
@@ -72,35 +113,17 @@ bool encrypted_read(AES_KEY dec_key, int fd, struct packet *p){
             char encrypted_data[p->len];
             n = recv(fd, encrypted_data, p->len, 0);
 
-            // printf("in read len is %d and data is %s\n", p->len, p->data);
-
             if (n < 0) {
                 printf("Error reading packet data from client %s\n", p->src);
                 return false;
             } 
 
-            // unsigned char dec_out[400];
 
-            unsigned char *dec_out = malloc(600);
-            memset(dec_out, 0, 600);
-            
-            // AES dec_key;
-            // AES_set_decrypt_key(key, 128, &dec_key);
-            AES_decrypt(encrypted_data, dec_out, &dec_key);
-            
-            // printf("len %d\n", p->len);
-            int dec_len = 0;
-            for(int i=0;*(dec_out+i)!=0x00;i++) {
-                dec_len += 1;
-            }
-
-            printf("Decrypted %d bytes of data: %s\n", dec_len, dec_out);
-
-            p->len = dec_len;
+            char *data = aes_decrypt(d_ctx, encrypted_data, &p->len);
 
             memset(p->data, 0, 400);
-            memcpy(p->data, dec_out, p->len);
-            free(dec_out);
+            memcpy(p->data, data, p->len);;
+
 
             
         }
@@ -108,7 +131,7 @@ bool encrypted_read(AES_KEY dec_key, int fd, struct packet *p){
     }
 }
 
-void encrypted_write(AES_KEY enc_key, int fd, int type, char *src, char *dst, int len, int msg_id, 
+void encrypted_write(EVP_CIPHER_CTX *e_ctx, int fd, int type, char *src, char *dst, int len, int msg_id, 
                  char *data)
 {
     struct header p;
@@ -122,29 +145,56 @@ void encrypted_write(AES_KEY enc_key, int fd, int type, char *src, char *dst, in
 
     // data needs to be encrypted
     if (len > 0){
-        unsigned char *enc_out = malloc(600);
-        memset(enc_out, 0, 600);
-    	
-        AES_encrypt(data, enc_out, &enc_key);      
+        int new_len = len;
+        char *encrypted_data = aes_encrypt(e_ctx, data, &new_len);
 
-        int enc_len = 0;
-        for(int i=0; *(enc_out+i)!=0x00; i++){
-        	enc_len += 1;
-        }
     
-        p.len = htonl(enc_len);
+        p.len = htonl(new_len);
 
         write(fd, (char *) &p, sizeof(p));
 
-        // Write data
+        // // Write data
         if (len > 0) {
-            write(fd, enc_out, enc_len);
-            free(enc_out);
+            write(fd, encrypted_data, new_len);
+            free(encrypted_data);
+            // free(enc_out);
         }
     } 
 
     else {
         write(fd, (char *) &p, sizeof(p));
     }
+}
+
+
+
+
+/**
+ * Create a 256 bit key and IV using the supplied key_data. salt can be added for taste.
+ * Fills in the encryption and decryption ctx objects and returns 0 on success
+ **/
+int aes_init(unsigned char *key_data, int key_data_len, unsigned char *salt, EVP_CIPHER_CTX *e_ctx, 
+             EVP_CIPHER_CTX *d_ctx)
+{
+  int i, nrounds = 5;
+  unsigned char key[32], iv[32];
+  
+  /*
+   * Gen key & IV for AES 256 CBC mode. A SHA1 digest is used to hash the supplied key material.
+   * nrounds is the number of times the we hash the material. More rounds are more secure but
+   * slower.
+   */
+  i = EVP_BytesToKey(EVP_aes_256_cbc(), EVP_sha1(), salt, key_data, key_data_len, nrounds, key, iv);
+  if (i != 32) {
+    printf("Key size is %d bits - should be 256 bits\n", i);
+    return -1;
+  }
+
+  EVP_CIPHER_CTX_init(e_ctx);
+  EVP_EncryptInit_ex(e_ctx, EVP_aes_256_cbc(), NULL, key, iv);
+  EVP_CIPHER_CTX_init(d_ctx);
+  EVP_DecryptInit_ex(d_ctx, EVP_aes_256_cbc(), NULL, key, iv);
+
+  return 0;
 }
 
