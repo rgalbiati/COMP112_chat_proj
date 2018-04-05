@@ -275,7 +275,6 @@ void send_packet(int fd, int type, char *src, char *dst, int len, int msg_id,
 
 bool read_from_server (int fd, struct packet *p) {
     return encrypted_read(&dec_key, fd, p);
-    // return true;
 }
 
 bool welcome_user (int sockfd)

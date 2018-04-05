@@ -134,7 +134,7 @@ int getChatListLen(char *client, struct chatList *c){
 	for (int i = 0; i < numChats; i++){
 		if (isMemberChat(client, c->chats[i])){
 			struct chat *ch = c->chats[i];
-			len += strlen(ch->id) + 2;
+			len += strlen(ch->id) + 1;
 			int numMembers = ch->numMembers;
 			for (int j = 0; j < numMembers; j++){
 				len += strlen(ch->members[j])+ 1;
