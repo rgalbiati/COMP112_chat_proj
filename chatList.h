@@ -3,8 +3,7 @@
 
 struct chat {
     char id[40];
-    int chatStatus;			  // -1 - unset, 0 - valid, 1 - pending 
-    // bool public;			  
+    int chatStatus;			  // -1 - unset, 0 - valid, 1 - pending 		  
     int numMembers;			  
     char members[5][20];      // up to 5 clients in a chat
    	int memberStatus[5];	  // -1 - unset, 0 - valid, 1 - pending 
@@ -37,6 +36,5 @@ void removeUserFromGeoChat(char *client, char *location, struct chatList *c);
 int numMembersChat(struct chat *ch);
 int getChatStatus(struct chat *ch);
 bool isMemberChat(char *client, struct chat *ch);
-// bool isPublic(struct chat *ch);
 
 #endif

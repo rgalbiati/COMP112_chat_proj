@@ -73,11 +73,10 @@ bool addClient(char *id, int fd, char *pw, char *ip, struct clientList *c){
     createSalt(c->clients[c->numClients]->salt);
     memcpy(c->clients[c->numClients]->id, id, strlen(id) + 1);
 
-    // TODO PW IS SALTED BUT STILL NEEDS TO BE HASHED
+    // PW is salted, not hashed (still in program memory)
     char salted_pass[SALT_LEN + PASS_LEN];
     memcpy(&salted_pass, c->clients[c->numClients]->salt, SALT_LEN);
     memcpy(&salted_pass[SALT_LEN], pw, strlen(pw) + 1);
-    // printf("salted: %s\n", salted_pass);
 
     memcpy(c->clients[c->numClients]->pw, salted_pass, strlen(salted_pass) + 1);
 
@@ -107,7 +106,6 @@ char *getCountry(char *data){
     int i = 0;
     char *token = strtok(tmp, ",");
     while(token){
-        // printf("%s\n", token);
         if (token[i] == '\"' && token[i + 1] == 'c' && token[i+2] == 'o' &&
             token[i+3] == 'u' && token[i+4] == 'n' && token[i+5] == 't' && 
             token[i+6] == 'r' && token[i+7] == 'y' && token[i+8] == '_' && 
@@ -119,8 +117,6 @@ char *getCountry(char *data){
             entry = token;
             token = strtok(entry, "\"");
 
-            // char *city = malloc(strlen(token) + 1);
-            // printf("found country: %s\n", token);
             char *country = malloc(LOC_LEN);
             memcpy(country, token, strlen(token) + 1);
             free(tmp);
@@ -137,7 +133,6 @@ char *getCity(char *data){
     int i = 0;
     char *token = strtok(tmp, ",");
     while(token){
-        // printf("%s\n", token);
         if (token[i] == '\"' && token[i + 1] == 'c' && token[i+2] == 'i' &&
             token[i+3] == 't' && token[i+4] == 'y') {
             char *entry = token;
@@ -146,8 +141,6 @@ char *getCity(char *data){
             entry = token;
             token = strtok(entry, "\"");
 
-            // char *city = malloc(strlen(token) + 1);
-            // printf("found city: %s\n", token);
             char *city = malloc(LOC_LEN);
             memcpy(city, token, strlen(token) + 1);
             free(tmp);
@@ -205,8 +198,6 @@ char *getGeoData(char *ip){
         return false;
     }
 
-    // printf("post write\n");
-
     char buffer[BIG_BUF];
     memset(buffer, 0, BIG_BUF);
 
@@ -215,7 +206,6 @@ char *getGeoData(char *ip){
         printf("Error reading from freegeoip.net\n");
         return false;
     }
-    // printf("BUFFER:\n%s\n", buffer);
 
     int i = 0;
 
@@ -223,7 +213,6 @@ char *getGeoData(char *ip){
     char *token = NULL;
     token = strtok(buffer, "\n\n");
     while(token){
-        // printf("TOKEN\n%s\n", token);
         if (token[0] == '{') break;
         token = strtok(NULL, "\n\n");
     }
@@ -298,20 +287,16 @@ bool setfd(char *id, int fd, struct clientList *c){
     return false;
 }
 
-// THIS NEEDS TO BE ENCRYPTED
 bool logInClient(char *id, char *pw, char *ip, struct clientList *c) {
     int numClients = c->numClients;
     for (int i = 0; i < numClients; i++) {
 
         if (strcmp(c->clients[i]->id, id) == 0){
 
-            // salt & hash the test password
             char salted_pass[PASS_LEN + SALT_LEN];
             char *salt = c->clients[i]->salt;
             memcpy(&salted_pass, salt, SALT_LEN);
             memcpy(&salted_pass[SALT_LEN], pw, strlen(pw) + 1);
-
-            // TODO password is hashed not salted
 
             if (strcmp(salted_pass, c->clients[i]->pw) == 0){
                 c->clients[i]->logged_in = true;
