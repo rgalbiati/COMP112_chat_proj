@@ -16,10 +16,6 @@
 
 #define STDIN 0
 
-
-//TODO Client list only prints partially 
-//TODO clean up client interface
-//TODO make code more readable 
 #define USER_LEN 20
 const static int PASS_LEN = 30;
 const int BUFSIZE = 512;
@@ -55,17 +51,24 @@ struct __attribute__((__packed__)) header {
     unsigned int msg_id;
 };
 
+void print_clients (struct packet * packet);
+void print_chats (struct packet *packet);
 void error(const char *msg);
+bool try_again(bool (f) (int), int sockfd, char* error); 
+char* sanitize_input(char* word);
 bool create_new_user(int sockfd);
-bool login(int sockfd);
+bool login(int sockfd); 
+void logout(int sockfd); 
 void send_packet(int fd, int type, char *src, char *dst, int len, int msg_id, 
                  char *data);
-bool read_from_server (int sockfd, struct packet *p);
+bool read_from_server (int fd, struct packet *p);
 bool welcome_user (int sockfd);
-bool try_again(bool (f) (int), int sockfd, char* error);
 void print_usage ();
+void send_chat_req(int sockfd);
+void respond_to_request (int sockfd, struct packet *p);
+void read_message(struct packet *p);
 
-// AES_KEY enc_key, dec_key;
+
 EVP_CIPHER_CTX enc_key, dec_key;
 
 void print_clients (struct packet * packet)
@@ -273,7 +276,8 @@ void send_packet(int fd, int type, char *src, char *dst, int len, int msg_id,
     encrypted_write(&enc_key, fd, type, src, dst, len, msg_id, data);
 }
 
-bool read_from_server (int fd, struct packet *p) {
+bool read_from_server (int fd, struct packet *p) 
+{
     return encrypted_read(&dec_key, fd, p);
 }
 
@@ -385,8 +389,6 @@ void send_message (int sockfd)
     bzero(buffer,256);
     fgets(buffer,256,stdin);
 
-    // TODO not sure what to do with message id...
-    // printf("id after is %s\n", id);
     send_packet(sockfd, MSG, USERNAME, id, strlen(buffer) + 1, 
                             1, buffer);
 }
@@ -433,9 +435,6 @@ int main(int argc, char *argv[])
     fd_set writefds;
     fd_set readfds;
     struct packet p;
-
-    // AES_set_decrypt_key(key, 128, &dec_key);
-    // AES_set_encrypt_key(key, 128, &enc_key);
 
     char buffer[256];
     if (argc < 4) {
